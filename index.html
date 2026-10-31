@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spontaneous</title>
+    <style>
+      /* Painted before the bundle loads so the window never flashes white. */
+      html, body { background: #09090a; margin: 0; }
+      #boot { position: fixed; inset: 0; display: grid; place-items: center; transition: opacity .24s cubic-bezier(.22,1,.36,1); }
+      #boot img { width: 64px; height: 64px; opacity: .9; }
+      #boot[data-done] { opacity: 0; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="boot"><img src="/favicon.svg" alt="" /></div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,113 @@
+.app {
+  --left-w: 0px;
+  --right-w: var(--sidepanel);
+  display: grid;
+  height: 100vh;
+  background: var(--background);
+  grid-template-columns: minmax(0, 1fr) var(--right-w);
+  transition: grid-template-columns var(--panel-duration) var(--ease-panel);
+  grid-template-rows: var(--titlebar) minmax(0, 1fr) 56px;
+  grid-template-areas:
+    "top top"
+    "stage side"
+    "scrub side";
+}
+/* Lite while previewing a shot: the preview's own timeline sits on the stage, so the scrub row folds away. */
+.app[data-mode="lite"][data-preview] { grid-template-rows: var(--titlebar) minmax(0, 1fr) 0; }
+.app[data-mode="studio"] {
+  --left-w: var(--inspector);
+  grid-template-columns: var(--left-w) minmax(0, 1fr) var(--right-w);
+  grid-template-rows: var(--titlebar) minmax(0, 1fr) var(--timeline);
+  /* The inspector runs full height, so the timeline sits between the two sidebars and grows when either closes. */
+  grid-template-areas:
+    "top top top"
+    "inspector stage side"
+    "inspector timeline side";
+}
+
+/* ── Collapsing sidebars ──
+   The column springs to zero while the panel's content keeps its width and is
+   clipped, so it slides out instead of reflowing. A short blur rides the move. */
+.app[data-left-closed] { --left-w: 0px; }
+.app[data-right-closed] { --right-w: 0px; }
+.inspector, .side { overflow: hidden; }
+.inspector { align-items: flex-end; }
+.inspector > * { width: var(--inspector); flex-shrink: 0; }
+.side { align-items: flex-start; }
+.side > * { width: var(--sidepanel); flex-shrink: 0; }
+.app[data-moved-left] .inspector > *, .app[data-moved-right] .side > * { animation: panelIn var(--panel-duration) var(--ease-reveal) both; }
+.app[data-moved-left][data-left-closed] .inspector > *, .app[data-moved-right][data-right-closed] .side > * { animation: panelOut 280ms var(--ease-in-out) both; }
+@keyframes panelIn { 0% { opacity: 0; filter: blur(8px); } 50% { opacity: .9; filter: blur(2px); } 100% { opacity: 1; filter: blur(0); } }
+@keyframes panelOut { 0% { opacity: 1; filter: blur(0); } 60% { opacity: .5; filter: blur(4px); } 100% { opacity: 0; filter: blur(8px); } }
+
+/* ── Top bar ── */
+.top { grid-area: top; position: relative; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-2-5) 0 var(--space-4); box-shadow: inset 0 -1px 0 var(--border-subtle); }
+:global(html[data-native]) .top { padding-left: 84px; } /* clear the traffic lights */
+.crumbs { display: flex; align-items: center; gap: var(--space-2); min-width: 0; color: var(--text-muted); font-size: var(--text-sm); }
+.crumbSep { color: var(--g-600); }
+.project { display: inline-flex; align-items: center; gap: var(--space-1); height: var(--control-height-sm); margin-left: calc(var(--space-1-5) * -1); padding: 0 var(--space-1-5); border: 0; border-radius: var(--radius-sm); background: none; color: var(--foreground); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.project:hover { background: var(--hover); }
+.center { position: absolute; left: 50%; translate: -50% 0; }
+.right { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+.topDivider { width: 1px; height: 16px; margin: 0 var(--space-1) 0 var(--space-1-5); background: var(--border); }
+
+/* ── Inspector ── */
+.inspector { grid-area: inspector; box-shadow: inset -1px 0 0 var(--border-subtle); }
+.inspectorTabs { padding: var(--space-3) var(--space-3) 0; flex: none; }
+.inspectorBody { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.templateGrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) var(--space-2-5); }
+.stack { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* ── Stage ── */
+.stage { grid-area: stage; position: relative; min-height: 0; }
+
+/* ── Shot preview: the template's own timeline, in the dock slot under the artboard ── */
+.previewBar { position: absolute; left: 50%; bottom: var(--space-5); translate: -50% 0; z-index: 7; width: min(520px, calc(100% - var(--space-8))); }
+.previewTime { flex: none; min-width: 6.2ch; padding: 0 var(--space-1); font-size: var(--text-xs); }
+.spanTrack { position: relative; flex: 1; align-self: stretch; min-width: 80px; cursor: pointer; touch-action: none; }
+.spanTrack:focus-visible { outline: none; }
+.spanTrack:focus-visible .spanRail { box-shadow: var(--well-shadow), 0 0 0 2px var(--focus-ring, rgb(255 255 255 / .25)); }
+.spanRail { position: absolute; top: 25%; bottom: 25%; left: 0; right: 0; border-radius: var(--radius-sm); background: var(--g-950); box-shadow: var(--well-shadow); }
+/* Each move of the shot, where it happens in the span; after the last one the shot rests. */
+.spanMove { position: absolute; top: 44%; height: 12%; min-width: 3px; translate: 0 -50%; border-radius: 2px; background: var(--g-400); pointer-events: none; }
+.spanHead { position: absolute; top: 18%; bottom: 18%; width: 3px; translate: -50% 0; border-radius: 2px; background: var(--face-bg); box-shadow: var(--face-shadow); pointer-events: none; }
+.previewLength { flex: none; width: 104px; }
+.app .previewBar:has(.backToClip) { width: min(640px, calc(100% - var(--space-8))); }
+.backToClip { flex: none; gap: var(--space-1-5); height: var(--key-size); padding: 0 var(--space-3); border-radius: var(--radius-key); font-size: var(--text-sm); }
+
+/* ── Side panel ── */
+.side { grid-area: side; box-shadow: inset 1px 0 0 var(--border-subtle); }
+.status { display: inline-flex; align-items: center; gap: var(--space-1-5); margin-left: auto; color: var(--text-muted); font-size: var(--text-xs); }
+.working { animation: pulse 1.2s var(--ease-in-out) infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.notes { display: flex; flex: 1; flex-direction: column; gap: var(--space-2); min-height: 0; overflow-y: auto; padding: var(--space-3); scrollbar-width: thin; }
+.notesBar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2-5) var(--space-3); box-shadow: inset 0 1px 0 var(--border-subtle); color: var(--text-muted); font-size: var(--text-xs); flex: none; }
+.notesCount { flex: 1; font-variant-numeric: tabular-nums; }
+.emptyNotes { margin: auto; max-width: 240px; color: var(--text-muted); font-size: var(--text-sm); text-align: center; }
+
+/* ── Lite scrub bar ── */
+.scrub { grid-area: scrub; display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-4); }
+.scrubTrack { position: relative; flex: 1; height: 22px; cursor: pointer; }
+.scrubRail { position: absolute; top: 50%; left: 0; right: 0; height: 6px; translate: 0 -50%; border-radius: 3px; background: var(--g-700); box-shadow: var(--well-shadow); }
+.scrubZoom { position: absolute; top: 50%; height: 6px; translate: 0 -50%; border-radius: 3px; background: var(--g-500); }
+.scrubFill { position: absolute; top: 50%; left: 0; height: 6px; translate: 0 -50%; border-radius: 3px; background: var(--clip-bg); box-shadow: var(--clip-shadow); }
+.scrubPin { position: absolute; top: 50%; translate: -50% -50%; }
+.scrubHead { position: absolute; top: 50%; width: 12px; height: 18px; translate: -50% -50%; border-radius: 4px; background: var(--face-bg); box-shadow: var(--face-shadow); }
+
+/* ── Timeline ── */
+.timelineArea { grid-area: timeline; display: flex; flex-direction: column; min-height: 0; background: var(--surface); box-shadow: inset 0 1px 0 var(--border-subtle); }
+.timelineFit { flex: 1; min-width: 0; min-height: 0; }
+.zoomRange { display: flex; align-items: center; gap: var(--space-2); color: var(--text-muted); }
+.zoomRange input { width: 110px; accent-color: var(--g-300); }
+
+/* ── New project ── */
+.newProject { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); height: 100vh; padding: var(--space-8); text-align: center; }
+.newProject h1 { margin: var(--space-3) 0 0; color: var(--foreground); font-size: var(--text-2xl); font-weight: var(--weight-strong); letter-spacing: var(--tracking-display); }
+.newProject p { max-width: 340px; margin: 0; color: var(--text-secondary); font-size: var(--text-md); }
+.newActions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+
+/* Shot motion primitives */
+.primitives { display: flex; flex-direction: column; gap: var(--space-1); }
+.primitive { display: grid; grid-template-columns: 62px 1fr auto; align-items: center; gap: var(--space-2); height: 26px; padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--well-bg); box-shadow: var(--well-shadow); color: var(--text-muted); font-size: var(--text-xs); }
+.primitive b { color: var(--foreground); font-weight: var(--weight-medium); }
+.primitive .mono { font-size: 10px; }

@@ -1,0 +1,146 @@
+/* ── Dock: the floating slab ─────────────────────────────────── */
+.dock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--dock-pad);
+  border-radius: var(--radius-dock);
+  background: var(--dock-bg);
+  box-shadow: var(--dock-shadow);
+  color: var(--foreground);
+}
+.divider { flex: none; width: 1px; align-self: stretch; margin: var(--space-2) var(--space-1); background: linear-gradient(to bottom, transparent, rgb(255 255 255 / .08) 20%, rgb(255 255 255 / .08) 80%, transparent); box-shadow: 1px 0 0 rgb(0 0 0 / .5); }
+
+/* Dock tool key: square, inside the dock, nested radius. */
+.tool {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--key-size);
+  height: var(--key-size);
+  border: 0;
+  border-radius: var(--radius-key);
+  background: transparent;
+  color: var(--text-muted);
+  transition: color var(--duration-instant) var(--ease-standard), background-color var(--duration-instant) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
+}
+.tool:hover { color: var(--foreground); background: var(--hover); }
+.tool:active { transform: scale(.94); }
+.tool[aria-pressed="true"] { color: var(--foreground); background: var(--key-bg-on); box-shadow: var(--key-shadow); }
+.tool[data-live] { color: var(--rec); }
+.tool svg { width: 16px; height: 16px; stroke-width: 1.75; }
+
+/* Move handle: the grip at the dock's leading edge. The whole slab also drags. */
+.handle { display: grid; place-items: center; flex: none; width: 18px; height: var(--key-size); margin-right: calc(var(--space-1) * -1); border-radius: var(--radius-sm); color: var(--g-500); cursor: grab; transition: color var(--duration-fast) var(--ease-standard); }
+.handle:hover { color: var(--text-secondary); }
+.handle:active { cursor: grabbing; }
+.handle svg { width: 14px; height: 14px; pointer-events: none; }
+
+/* Text well inside the dock. */
+.well {
+  flex: 1;
+  min-width: 0;
+  height: var(--key-size);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-key);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-base);
+  outline: none;
+}
+.well::placeholder { color: var(--text-muted); }
+.time { padding: 0 var(--space-1-5) 0 var(--space-0-5); color: var(--ink); font: var(--weight-medium) var(--text-xs) var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* The round send/face key at the end of the annotation dock. */
+.send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: 0 2px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--face-bg);
+  box-shadow: var(--face-shadow);
+  color: var(--face-fg);
+  transition: transform var(--duration-instant) var(--ease-standard), opacity var(--duration-instant);
+}
+.send:disabled { opacity: .35; }
+.send:active { transform: scale(.92); box-shadow: var(--face-shadow-pressed); }
+.send svg { width: 15px; height: 15px; stroke-width: 2.25; }
+
+.live { color: var(--rec); }
+
+/* ── Annotation dock placement on the stage ──────────────────── */
+.annotation { position: absolute; left: 50%; bottom: var(--space-5); translate: -50% 0; z-index: 7; width: min(560px, calc(100% - var(--space-8))); }
+
+/* ── Recorder dock ───────────────────────────────────────────── */
+.recorder { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.recordKey {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  min-width: 92px; /* Record / Starting… / Stop / Saving… swap without resizing the dock */
+  height: var(--key-size);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-key);
+  background: var(--face-bg);
+  box-shadow: var(--face-shadow);
+  color: var(--face-fg);
+  font-size: var(--text-base);
+  font-weight: var(--weight-strong);
+  white-space: nowrap;
+  transition: transform var(--duration-instant) var(--ease-standard), opacity var(--duration-instant);
+}
+.recordKey:active { transform: scale(.97); box-shadow: var(--face-shadow-pressed); }
+.recordKey:disabled { opacity: .5; }
+.recDot { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); box-shadow: inset 0 -1px 1px rgb(0 0 0 / .25); }
+.recSquare { width: 8px; height: 8px; border-radius: 2px; background: var(--rec); }
+.clock { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 76px; padding: 0 var(--space-2); font: var(--weight-medium) var(--text-md) var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.blink { animation: blink 1.4s var(--ease-in-out) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.status { padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; }
+
+/* Window chooser above the dock */
+.sheet {
+  width: 100%;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--dock-pad);
+  border-radius: var(--radius-dock);
+  background: var(--dock-bg);
+  box-shadow: var(--dock-shadow);
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / .1) transparent;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  width: 100%;
+  height: var(--key-size);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-key);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.row:hover { background: var(--hover); color: var(--foreground); }
+.row[aria-checked="true"] { background: var(--key-bg-on); box-shadow: var(--key-shadow); color: var(--foreground); }
+.row b { color: var(--foreground); font-weight: var(--weight-medium); flex: none; }
+.row span { overflow: hidden; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.notice { display: flex; align-items: center; gap: var(--space-2-5); padding: var(--space-2) var(--space-3); color: var(--text-secondary); font-size: var(--text-sm); }
+.notice b { color: var(--foreground); font-weight: var(--weight-medium); }
+
+/* ── Forced states (docs previews): [data-force] on an ancestor renders the state statically. ── */
+:global([data-force="hover"]) .tool { color: var(--foreground); background: var(--hover); }
+:global([data-force="active"]) .tool { transform: scale(.94); }
+:global([data-force="active"]) .recordKey { transform: scale(.97); box-shadow: var(--face-shadow-pressed); }

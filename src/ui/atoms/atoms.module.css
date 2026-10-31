@@ -1,0 +1,117 @@
+/* ── Key ─────────────────────────────────────────────────────────
+   Three variants, one per level of the hierarchy:
+     primary    the mark's light cell. One per surface.
+     secondary  a dark machined key. Other real actions.
+     tertiary   no material until hovered. Quiet, reversible, escape.   */
+.key {
+  --h: var(--control-height-md);
+  --r: var(--radius-md);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  height: var(--h);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--r);
+  background: var(--key-bg);
+  box-shadow: var(--key-shadow);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition:
+    transform var(--duration-instant) var(--ease-standard),
+    box-shadow var(--duration-instant) var(--ease-standard),
+    opacity var(--duration-instant);
+}
+.key[data-size="sm"] { --h: var(--control-height-sm); --r: var(--radius-sm); padding: 0 var(--space-2); font-size: var(--text-xs); }
+.key[data-size="lg"] { --h: var(--control-height-lg); --r: var(--radius-key); padding: 0 var(--space-4); font-size: var(--text-base); }
+.key:hover { background: var(--key-bg-hover); }
+.key:active { transform: translateY(.5px) scale(.98); box-shadow: var(--key-shadow-pressed); }
+.key[aria-pressed="true"] { background: var(--key-bg-on); box-shadow: var(--key-shadow-pressed); }
+.key:disabled { opacity: .4; pointer-events: none; }
+.key svg { width: 15px; height: 15px; stroke-width: 1.75; flex: none; }
+
+.key[data-variant="primary"] { background: var(--face-bg); box-shadow: var(--face-shadow); color: var(--face-fg); font-weight: var(--weight-strong); }
+.key[data-variant="primary"]:active { box-shadow: var(--face-shadow-pressed); }
+.key[data-variant="tertiary"] { background: transparent; box-shadow: none; color: var(--text-secondary); }
+.key[data-variant="tertiary"]:hover { background: var(--hover); color: var(--foreground); }
+.key[data-variant="tertiary"][aria-pressed="true"] { background: var(--key-bg-on); box-shadow: var(--key-shadow); color: var(--foreground); }
+
+.key[data-icon-only] { width: var(--h); padding: 0; }
+
+/* ── Kbd ─────────────────────────────────────────────────────── */
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-xs);
+  background: var(--key-bg);
+  box-shadow: var(--key-shadow);
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+}
+
+/* ── Label ───────────────────────────────────────────────────── */
+.label { color: var(--text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+
+/* ── Timecode ────────────────────────────────────────────────── */
+.timecode { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-sm); letter-spacing: 0; color: var(--foreground); }
+.timecode[data-muted] { color: var(--text-muted); }
+
+/* ── Tag ─────────────────────────────────────────────────────────
+   Compact, inset label. Sizes: sm (16px, dense rows) and md (18px).   */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 18px;
+  padding: 0 var(--space-1-5);
+  border-radius: 5px;
+  background: var(--well-bg);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / .35), inset 0 0 0 .5px rgb(255 255 255 / .04);
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+.tag[data-size="sm"] { height: 16px; padding: 0 5px; border-radius: 4px; font-size: 10px; }
+.tag[data-tone="ink"] { background: var(--ink-soft); box-shadow: none; color: var(--ink); }
+.tag[data-tone="rec"] { background: var(--rec-soft); box-shadow: none; color: var(--rec); }
+
+/* ── Cell ────────────────────────────────────────────────────────
+   The mark's building block, used as the marker shape everywhere
+   (author dots, pins, list bullets) instead of circles.             */
+.cell {
+  --s: 7px;
+  display: inline-block;
+  flex: none;
+  width: var(--s);
+  height: var(--s);
+  border-radius: calc(var(--s) * .16);
+  transform: skewX(-12deg);
+  background: var(--g-200);
+}
+.cell[data-variant="hollow"] { background: transparent; box-shadow: inset 0 0 0 1.25px var(--g-300); }
+.cell[data-variant="ink"] { background: var(--ink); }
+.cell[data-variant="rec"] { background: var(--rec); }
+.cell[data-variant="muted"] { background: var(--g-500); }
+
+/* ── Meter ───────────────────────────────────────────────────── */
+.meter { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
+.meter i { width: 2px; border-radius: 1px; background: currentColor; animation: meter 900ms var(--ease-in-out) infinite alternate; }
+@keyframes meter { from { height: 20%; } to { height: 100%; } }
+
+/* ── Forced states (docs previews): [data-force] on an ancestor renders the state statically. ── */
+:global([data-force="hover"]) .key { background: var(--key-bg-hover); }
+:global([data-force="hover"]) .key[data-variant="tertiary"] { background: var(--hover); color: var(--foreground); }
+:global([data-force="active"]) .key { transform: translateY(.5px) scale(.98); box-shadow: var(--key-shadow-pressed); }
+:global([data-force="active"]) .key[data-variant="primary"] { box-shadow: var(--face-shadow-pressed); }
+:global([data-force="focus"]) .key { outline: 2px solid rgb(236 236 239 / .55); outline-offset: 2px; }

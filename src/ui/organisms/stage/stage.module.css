@@ -1,0 +1,67 @@
+/* Stage: the canvas hole plus what's drawn over it. */
+.stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--stage); }
+.canvas { position: relative; overflow: hidden; border-radius: var(--radius-lg); box-shadow: 0 0 0 1px var(--border), 0 24px 64px rgb(0 0 0 / .5); isolation: isolate; }
+.camera { position: absolute; inset: 0; display: grid; place-items: center; will-change: transform; container-type: size; }
+.video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+
+/* ── Device frames (inside the footage, so they use fixed product colors) ── */
+.browser {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--frame-radius, 12px);
+  background: #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / .25), 0 calc(var(--frame-shadow, 60) * .5px) calc(var(--frame-shadow, 60) * 1.2px) rgb(0 0 0 / calc(var(--frame-shadow, 60) / 100 * .6));
+}
+.browserBar { display: flex; align-items: center; gap: 10px; height: 7.5%; min-height: 18px; padding: 0 2.2%; background: #f3f3f4; border-bottom: 1px solid #e3e3e6; flex: none; }
+.browserBar[data-minimal] { height: 4%; min-height: 10px; background: #fafafa; }
+.lights { display: flex; gap: 6px; }
+.lights i { width: .8vmin; height: .8vmin; min-width: 6px; min-height: 6px; border-radius: 50%; background: #d9d9dc; }
+.address { flex: 1; max-width: 46%; height: 56%; margin: 0 auto; display: grid; place-items: center; border-radius: 6px; background: #e8e8eb; color: #6b6b72; font-size: clamp(7px, 1.05vmin, 11px); }
+.browserBody { position: relative; flex: 1; min-height: 0; }
+
+.phone { position: relative; height: 92%; aspect-ratio: 9 / 19.5; padding: 2.2%; border-radius: 13% / 6%; background: linear-gradient(145deg, #3a3a3e, #121214); box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / .12), 0 40px 80px rgb(0 0 0 / .6); }
+.phoneScreen { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 11% / 5.2%; background: #fff; }
+.island { position: absolute; top: 1.6%; left: 50%; z-index: 2; width: 30%; height: 3.6%; translate: -50% 0; border-radius: 999px; background: #000; }
+
+.cursor { position: absolute; z-index: 3; width: 2.2%; min-width: 12px; translate: -10% -6%; filter: drop-shadow(0 2px 3px rgb(0 0 0 / .35)); pointer-events: none; }
+.ripple { position: absolute; width: 5%; aspect-ratio: 1; translate: -50% -50%; border: 2px solid rgb(26 26 29 / .5); border-radius: 50%; pointer-events: none; }
+.callout { position: absolute; padding: .55em .9em; border-radius: .7em; background: #1a1a1d; color: #fff; font-size: clamp(8px, 1.3vmin, 14px); font-weight: 600; white-space: nowrap; box-shadow: 0 10px 30px rgb(0 0 0 / .35); }
+
+/* ── Annotation layer: your ink, in frame coordinates ── */
+.annotations { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.annotations[data-tool="pen"], .annotations[data-tool="region"] { pointer-events: auto; cursor: crosshair; }
+.ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ink path { fill: none; stroke: var(--ink); stroke-width: 3px; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.region { position: absolute; border: 1.5px dashed var(--ink); border-radius: var(--radius-sm); background: var(--ink-soft); }
+/* Pins are the mark's cell, skewed, in ink. */
+.pin {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  translate: -50% -50%;
+  transform: skewX(-12deg);
+  border: 0;
+  border-radius: 4px;
+  background: var(--ink);
+  color: #1d1505;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-strong);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .45), inset 0 -1px 0 rgb(0 0 0 / .2), 0 2px 6px rgb(0 0 0 / .4);
+  pointer-events: auto;
+}
+.pin[data-status="applied"] { background: var(--g-200); color: var(--g-900); }
+
+/* ── Stage chrome ── */
+.stageTop { position: absolute; top: var(--space-3); left: var(--space-3); right: var(--space-3); z-index: 6; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
+.stageTop > * { pointer-events: auto; }
+.chips { display: flex; align-items: center; gap: var(--space-1-5); }
+button.chip { border: 0; cursor: default; transition: color var(--duration-instant) var(--ease-standard); }
+button.chip:hover { color: var(--foreground); }
+button.chip:active { box-shadow: var(--key-shadow-pressed); }
+button.chip[aria-pressed="true"] { color: var(--foreground); }
+.chip { display: inline-flex; align-items: center; gap: var(--space-1-5); height: 24px; padding: 0 var(--space-2-5); border-radius: var(--radius-md); background: var(--key-bg); box-shadow: var(--key-shadow); color: var(--text-secondary); font-size: var(--text-xs); font-weight: var(--weight-medium); }

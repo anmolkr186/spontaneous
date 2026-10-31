@@ -1,0 +1,11 @@
+/* Room for the dock's shadow inside the transparent window. */
+.root { display: inline-flex; flex-direction: column; align-items: center; padding: var(--space-4) var(--space-6) var(--space-8); }
+/* The intro is centred on screen and fills its window. */
+.root[data-intro] { padding: 0; }
+
+/* Launch intro: a large transparent square so the icon can grow far past its
+   own size before it dissolves (matches INTRO_SIZE on the Rust side). The
+   window then shrinks into the dock. */
+.intro { position: relative; display: grid; place-items: center; width: 880px; height: 880px; overflow: hidden; pointer-events: none; }
+.layer { position: absolute; display: grid; place-items: center; will-change: transform, opacity, filter; }
+.bloom { position: absolute; width: 280px; height: 280px; border-radius: 50%; background: radial-gradient(closest-side, rgb(255 255 255 / .22), rgb(255 255 255 / .06) 55%, transparent); will-change: transform, opacity; }

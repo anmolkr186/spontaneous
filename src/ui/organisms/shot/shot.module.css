@@ -1,0 +1,214 @@
+/* A shot: backdrop + a 3D rig holding a device whose screen shows the recording.
+   Sizes use container units so the same scene renders as a thumbnail and on stage.
+   Light is a key from the upper left: lit faces are left and top, shade falls right. */
+.scene { position: absolute; inset: 0; overflow: hidden; container-type: size; perspective: 150cqw; perspective-origin: 50% 44%; }
+.backdrop { position: absolute; inset: 0; box-shadow: inset 0 0 16cqw rgb(0 0 0 / .2); }
+/* Fine grain keeps the gradients from banding and gives the backdrop a paper feel. */
+.backdrop::before { content: ""; position: absolute; inset: 0; opacity: .16; mix-blend-mode: overlay; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+/* Materials. Brushed aluminium: noise stretched along the grain. Stone: fine, even noise. */
+.scene {
+  --brushed: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='b'><feTurbulence type='fractalNoise' baseFrequency='.9 .012' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23b)'/></svg>");
+  --stone: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='s'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/></filter><rect width='100%' height='100%' filter='url(%23s)'/></svg>");
+}
+/* A pool of light on the floor under the device, so it sits in the backdrop rather than on top of it. */
+.backdrop::after { content: ""; position: absolute; left: 15%; right: 15%; bottom: 0; height: 42%; background: radial-gradient(50% 60% at 50% 70%, rgb(255 255 255 / .16), transparent 70%); mix-blend-mode: soft-light; }
+.rig { position: absolute; inset: 0; display: grid; place-items: center; transform-style: preserve-3d; will-change: transform; }
+.preserve { transform-style: preserve-3d; }
+
+/* ── Box: six faces, front at z = 0, back at z = −d ── */
+.box { position: absolute; transform-style: preserve-3d; }
+.box > div { position: absolute; backface-visibility: hidden; }
+.front { inset: 0; }
+.back { inset: 0; transform: translateZ(calc(var(--d) * -1)) rotateY(180deg); }
+.top { left: 0; right: 0; bottom: 100%; height: var(--d); transform-origin: 50% 100%; transform: rotateX(90deg); }
+.bottom { left: 0; right: 0; top: 100%; height: var(--d); transform-origin: 50% 0; transform: rotateX(-90deg); }
+.left { top: 0; bottom: 0; right: 100%; width: var(--d); transform-origin: 100% 50%; transform: rotateY(-90deg); }
+.right { top: 0; bottom: 0; left: 100%; width: var(--d); transform-origin: 0 50%; transform: rotateY(90deg); }
+
+/* Shared screen glass */
+.screen { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: .7cqw .7cqw .25cqw .25cqw; background: #000; }
+.notch { position: absolute; top: 0; left: 50%; z-index: 3; width: 10%; height: 3.4%; translate: -50% 0; border-radius: 0 0 .6cqw .6cqw; background: #08080a; }
+/* Glass: a broad soft reflection from the key light, a crisp top edge, and a faint vignette at the corners. */
+.glare {
+  position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit;
+  background:
+    linear-gradient(118deg, rgb(255 255 255 / .14) 0%, rgb(255 255 255 / .04) 30%, rgb(255 255 255 / 0) 44%),
+    linear-gradient(180deg, rgb(255 255 255 / .09) 0, rgb(255 255 255 / 0) .5cqw),
+    radial-gradient(120% 120% at 50% 40%, transparent 65%, rgb(0 0 0 / .14));
+}
+/* A debossed mark on the back of lids and panels. */
+.emboss { position: absolute; left: 50%; top: 48%; width: 9%; aspect-ratio: 1; translate: -50% -50%; border-radius: 26%; background: linear-gradient(145deg, rgb(0 0 0 / .22), rgb(255 255 255 / .06)); box-shadow: inset .1cqw .1cqw .2cqw rgb(0 0 0 / .35), .06cqw .06cqw 0 rgb(255 255 255 / .08); }
+
+/* ── Laptop ── 56cqw wide; lid 36.7 tall; base 38.4 deep and 1.15 thick. */
+.mac { position: relative; width: 56cqw; height: 36.7cqw; translate: 0 -5cqw; transform-style: preserve-3d; }
+
+.lid { inset: 0; --d: .45cqw; transform-origin: 50% 100%; }
+.lid > .front { padding: 1.5cqw 1.4cqw 2.3cqw; border-radius: 1.6cqw 1.6cqw .4cqw .4cqw; background: linear-gradient(180deg, #0b0b0d, #050506); box-shadow: inset 0 0 0 .14cqw #55565c, inset 0 0 0 .3cqw #09090a, 0 0 6cqw rgb(200 214 255 / .12), 0 0 1.4cqw rgb(200 214 255 / .08); }
+.lid > .back { border-radius: 1.6cqw 1.6cqw .4cqw .4cqw; background: radial-gradient(90% 70% at 20% 10%, rgb(255 255 255 / .09), transparent 60%), linear-gradient(160deg, #4a4b51 0%, #37383d 50%, #27282c 100%); }
+.lid > .top { background: linear-gradient(90deg, #8a8b91, #55565b); border-radius: .3cqw; }
+.lid > .left { background: #66676d; }
+.lid > .right { background: #2c2d31; }
+.lid > .bottom { background: #18181b; }
+
+.base { left: 0; width: 100%; top: 100%; height: 1.15cqw; --d: 38.4cqw; transform: translateZ(38.4cqw); }
+.base > .front { border-radius: 0 0 1.4cqw 1.4cqw; background: linear-gradient(180deg, #6c6d73 0%, #45464b 28%, #26272a 100%); }
+.base > .top { border-radius: .8cqw .8cqw 1.4cqw 1.4cqw; background: radial-gradient(110% 80% at 12% 0%, rgb(255 255 255 / .1), transparent 60%), linear-gradient(180deg, #3b3c41 0%, #35363b 100%); box-shadow: inset 0 0 0 .1cqw rgb(255 255 255 / .06); }
+.base > .left { background: linear-gradient(180deg, #5b5c62, #3b3c40); }
+.base > .right { background: #222326; }
+.base > .back { background: #1a1a1d; }
+.base > .bottom { background: #18181a; border-radius: 1cqw; }
+/* Brushed grain on every metal face; it sits under the face's own details. */
+.lid > .back::before, .base > .top::before, .base > .front::before, .panel > .back::before, .neck > .front::before, .foot > .top::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--brushed) 0 0 / 22cqw 22cqw; opacity: .22; mix-blend-mode: overlay; pointer-events: none;
+}
+.plinth > .front::before, .plinth > .top::before { content: ""; position: absolute; inset: 0; background: var(--stone) 0 0 / 12cqw 12cqw; opacity: .3; mix-blend-mode: overlay; }
+/* Light from the screen falling on the keyboard deck. */
+.base > .top::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(70% 38% at 50% 0%, rgb(205 218 255 / .16), transparent 75%); pointer-events: none; }
+.scoop { position: absolute; left: 43%; right: 43%; top: 0; height: 50%; border-radius: 0 0 1cqw 1cqw; background: linear-gradient(180deg, rgb(0 0 0 / .45), rgb(0 0 0 / .15)); }
+
+.hinge { position: absolute; left: 13%; right: 13%; top: 0; height: 2.4%; border-radius: 0 0 .5cqw .5cqw; background: linear-gradient(180deg, #121214, #2b2b2f); }
+.keys {
+  position: absolute; left: 15%; right: 15%; top: 7%; height: 41%; border-radius: .6cqw;
+  background:
+    repeating-linear-gradient(90deg, #0f0f11 0 .32cqw, transparent .32cqw calc(100% / 14)),
+    repeating-linear-gradient(180deg, #0f0f11 0 .32cqw, rgb(255 255 255 / .07) .32cqw .44cqw, transparent .44cqw calc(100% / 6)),
+    radial-gradient(70% 60% at 50% 0%, rgb(205 218 255 / .1), transparent 80%),
+    linear-gradient(180deg, #27272b, #1f1f22);
+  box-shadow: inset 0 0 0 .32cqw #0f0f11, 0 0 0 .12cqw rgb(0 0 0 / .3);
+}
+.grille { position: absolute; top: 7%; height: 41%; width: 8%; background: radial-gradient(circle, #19191c 32%, transparent 40%) 0 0 / .6cqw .6cqw; }
+.grille[data-side="l"] { left: 4.5%; }
+.grille[data-side="r"] { right: 4.5%; }
+.pad { position: absolute; left: 30%; right: 30%; top: 54%; bottom: 7%; border-radius: .9cqw; background: linear-gradient(125deg, rgb(255 255 255 / .07), transparent 45%), linear-gradient(180deg, #3b3c41, #35363b); box-shadow: inset 0 0 0 .1cqw rgb(255 255 255 / .08), inset 0 .12cqw .2cqw rgb(0 0 0 / .25), 0 .05cqw 0 rgb(255 255 255 / .05); }
+
+/* Floor shadow: a plane under the base, offset down-right away from the key light. */
+.macShadow {
+  position: absolute; left: -10%; right: -14%; bottom: -1.2cqw; height: 48cqw; transform-origin: 50% 100%; transform: translateZ(42cqw) rotateX(90deg);
+  background: radial-gradient(44% 40% at 53% 54%, rgb(0 0 0 / .5), transparent 72%), radial-gradient(50% 48% at 56% 58%, rgb(0 0 0 / .22), transparent 80%);
+  filter: blur(1.2cqw);
+}
+
+/* Contact shadow: tight and dark right at the edges, under the soft one. */
+.macContact {
+  position: absolute; left: -2%; right: -3%; bottom: -1.2cqw; height: 40cqw; transform-origin: 50% 100%; transform: translateZ(39.6cqw) rotateX(90deg);
+  border-radius: 1.6cqw; background: rgb(0 0 0 / .55); filter: blur(.5cqw);
+}
+
+/* ── Studio display ── 60cqw panel, aluminium stand, optional plinth. */
+.display { position: relative; width: 60cqw; height: 33.75cqw; translate: 0 -6cqw; transform-style: preserve-3d; }
+.display:has(.plinth) { translate: 0 -11cqw; }
+.panel { inset: 0; --d: .9cqw; }
+.panel > .front { padding: .9cqw; border-radius: 1.1cqw; background: linear-gradient(180deg, #0b0b0d, #050506); box-shadow: inset 0 0 0 .14cqw #55565c, inset 0 0 0 .3cqw #09090a, 0 0 7cqw rgb(200 214 255 / .12), 0 0 1.6cqw rgb(200 214 255 / .08); }
+.panel > .front .screen { border-radius: .45cqw; }
+.panel > .back { border-radius: 1.1cqw; background: radial-gradient(90% 70% at 20% 10%, rgb(255 255 255 / .1), transparent 60%), linear-gradient(160deg, #6a6b71 0%, #4a4b50 55%, #36373b 100%); }
+.panel > .top { background: linear-gradient(90deg, #a2a3a9, #6a6b70); }
+.panel > .left { background: #7b7c82; }
+.panel > .right { background: #3a3b3f; }
+.panel > .bottom { background: #2a2a2e; }
+
+.neck { left: calc(50% - 6cqw); width: 12cqw; top: 40%; height: calc(60% + 8.4cqw); --d: .7cqw; transform: translateZ(-3.4cqw); }
+.neck > .front { background: linear-gradient(90deg, #5a5b61, #7a7b81 45%, #55565b); }
+.neck > .back, .neck > .right { background: #3a3b40; }
+.neck > .left { background: #6d6e74; }
+.foot { left: calc(50% - 8cqw); width: 16cqw; top: calc(100% + 8.4cqw); height: .6cqw; --d: 16cqw; transform: translateZ(5cqw); }
+.foot > .top { border-radius: .8cqw; background: linear-gradient(180deg, #5d5e64, #75767c); }
+.foot > .front { background: #8b8c92; }
+.foot > .left { background: #6d6e74; }
+.foot > .right, .foot > .back, .foot > .bottom { background: #3a3b40; }
+.displayShadow {
+  position: absolute; left: 4%; right: 0; bottom: -9cqw; height: 28cqw; transform-origin: 50% 100%; transform: translateZ(9cqw) rotateX(90deg);
+  background: radial-gradient(40% 38% at 52% 56%, rgb(0 0 0 / .45), transparent 72%);
+  filter: blur(1.2cqw);
+}
+.displayContact { position: absolute; left: calc(50% - 8.4cqw); width: 16.8cqw; bottom: -9cqw; height: 16.6cqw; transform-origin: 50% 100%; transform: translateZ(5.3cqw) rotateX(90deg); border-radius: 1cqw; background: rgb(0 0 0 / .5); filter: blur(.5cqw); }
+.plinth { left: 6%; width: 88%; top: calc(100% + 9cqw); height: 14cqw; --d: 30cqw; transform: translateZ(15cqw); }
+.plinth > .front { background: linear-gradient(180deg, #313136 0%, #1b1b1f 55%, #111113 100%); box-shadow: inset 0 .18cqw 0 rgb(255 255 255 / .14), inset 0 -2cqw 3cqw rgb(0 0 0 / .35); }
+.plinth > .top { background: linear-gradient(180deg, #232326, #303035); }
+.plinth > .left { background: #26262a; }
+.plinth > .right, .plinth > .back, .plinth > .bottom { background: #0f0f11; }
+
+/* ── Tile, stack, wall: screens as glass slabs ── */
+.tile { position: relative; width: 66cqw; aspect-ratio: 16 / 10; --d: .5cqw; }
+.tile > .front { overflow: hidden; border-radius: 1.4cqw; background: var(--g-900); box-shadow: 0 3cqw 6cqw rgb(0 0 0 / .32), 0 .6cqw 1.4cqw rgb(0 0 0 / .2), 0 0 0 .1cqw rgb(255 255 255 / .1), 0 0 5cqw rgb(255 255 255 / .06); }
+.tile > .front > .glare { box-shadow: inset 0 0 0 .12cqw rgb(255 255 255 / .18), inset 0 .14cqw 0 rgb(255 255 255 / .22); }
+.tile > .back { border-radius: 1.4cqw; background: var(--g-800); }
+.tile > .top, .tile > .left { background: linear-gradient(90deg, #f4f4f7, #cfd0d6); }
+.tile > .bottom, .tile > .right { background: linear-gradient(180deg, #a3a4ab, #6d6e75); }
+.stack { position: relative; width: 56cqw; aspect-ratio: 16 / 10; translate: -4cqw 2cqh; transform-style: preserve-3d; }
+.stack .tile { position: absolute; inset: 0; width: auto; }
+.dim { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: #000; opacity: var(--dim); }
+.wall { display: grid; grid-template-columns: repeat(5, 30cqw); gap: 3cqw; transform-style: preserve-3d; }
+.wall .tile { width: 30cqw; }
+.wall .tile > .front { border-radius: 1cqw; }
+
+/* ── Flat browser / window (Basics) ── */
+.flat { position: relative; width: 80cqw; aspect-ratio: 16 / 10; overflow: hidden; display: flex; flex-direction: column; border-radius: 1.4cqw; background: var(--g-900); box-shadow: 0 0 0 .12cqw rgb(255 255 255 / .14), 0 4cqw 8cqw rgb(0 0 0 / .38), 0 1cqw 2cqw rgb(0 0 0 / .22), 0 .2cqw .4cqw rgb(0 0 0 / .2); }
+.flat::after { content: ""; position: absolute; inset: 0; z-index: 5; border-radius: inherit; pointer-events: none; background: linear-gradient(118deg, rgb(255 255 255 / .1), transparent 38%); box-shadow: inset 0 .12cqw 0 rgb(255 255 255 / .25); }
+/* Same chrome as the stage's browser frame, so the card shows what you get. */
+.flatBar { position: relative; display: flex; align-items: center; height: 6.5%; padding: 0 2%; flex: none; background: #f3f3f4; box-shadow: inset 0 -1px 0 #e3e3e6; }
+.lights { display: flex; gap: .8cqw; }
+.lights i { width: 1.1cqw; aspect-ratio: 1; border-radius: 50%; background: #d9d9dc; }
+.flatBar b { position: absolute; left: 33%; right: 33%; top: 22%; bottom: 22%; border-radius: .6cqw; background: #e8e8eb; }
+.flatBody { position: relative; flex: 1; }
+
+/* Zoom focus: the camera pushed in on the cursor. */
+.focus { position: absolute; inset: 0; overflow: hidden; }
+.focusCam { position: absolute; inset: 0; transform: scale(1.8); transform-origin: 40% 46%; }
+.cursor { position: absolute; left: 41%; top: 47%; width: 2.6cqw; fill: #fff; stroke: #0a0a0b; stroke-width: 1.3; stroke-linejoin: round; filter: drop-shadow(0 .3cqw .5cqw rgb(0 0 0 / .35)); }
+
+/* ── Stand-in screen: the Spontaneous editor, drawn from the tokens ──
+   Grid tracks on the container itself use % (its own cq units would resolve against the scene). */
+.art {
+  position: absolute; inset: 0; overflow: hidden; container-type: size;
+  display: grid; grid-template-columns: 1fr 28%; grid-template-rows: 8% 1fr 25%; row-gap: 2.4%; column-gap: 1.6%; padding-bottom: 1.6%;
+  background: var(--g-900); color: var(--foreground); font-family: var(--font-body); line-height: 1.3;
+}
+.aBar { grid-column: 1 / -1; display: flex; align-items: center; gap: 2.4cqw; padding: 0 1.6cqw 0 2.2cqw; background: var(--g-850); box-shadow: inset 0 -1px 0 var(--border); }
+.dots { display: flex; gap: .9cqw; }
+.dots i { width: 1.2cqw; aspect-ratio: 1; border-radius: 50%; background: var(--g-600); }
+.aCrumb { color: var(--text-secondary); font-size: 1.5cqw; font-weight: 500; }
+.aSwitch { display: flex; gap: .3cqw; margin-left: auto; padding: .4cqw; border-radius: 1.1cqw; background: var(--g-950); box-shadow: var(--well-shadow); }
+.aSwitch[data-full] { margin: 0; flex: none; }
+.aSwitch[data-full] em { flex: 1; }
+.aSwitch em { padding: .5cqw 1.4cqw; border-radius: .7cqw; color: var(--text-muted); font-size: 1.3cqw; font-style: normal; font-weight: 500; text-align: center; }
+.aSwitch em[data-on] { color: var(--foreground); background: linear-gradient(180deg, var(--g-600), var(--g-650)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .08), 0 0 0 .5px rgb(0 0 0 / .6); }
+
+.aStage { position: relative; min-height: 0; margin-left: 1.6cqw; display: grid; place-items: center; overflow: hidden; border-radius: 1.4cqw; background: var(--g-950); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.aCanvas { position: relative; width: 86%; height: 84%; display: grid; place-items: center; overflow: hidden; border-radius: 1cqw; }
+
+.appWin { display: flex; flex-direction: column; width: 70%; height: 74%; overflow: hidden; border-radius: .9cqw; background: #fbfbfc; box-shadow: 0 1.4cqw 3cqw rgb(0 0 0 / .26), 0 0 0 1px rgb(0 0 0 / .06); }
+.appHead { display: flex; align-items: center; gap: .6cqw; height: 12%; padding: 0 3%; flex: none; background: #efeff2; }
+.appHead i { width: .9cqw; aspect-ratio: 1; border-radius: 50%; background: #d5d5db; }
+.appBody { flex: 1; display: flex; flex-direction: column; gap: 7%; padding: 6%; }
+.appHero { position: relative; height: 32%; flex: none; border-radius: .6cqw; background: #ececf0; }
+.appHero::before, .appHero::after { content: ""; position: absolute; left: 7%; height: 15%; border-radius: 1cqh; }
+.appHero::before { top: 28%; width: 44%; background: #bfc0c8; }
+.appHero::after { top: 56%; width: 28%; background: #d6d6dd; }
+.appRow { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6%; }
+.appRow i { border-radius: .6cqw; background: #f3f3f6; box-shadow: inset 0 0 0 1px #e4e4e9; }
+
+.aSide { min-height: 0; margin-right: 1.6cqw; display: flex; flex-direction: column; gap: 1.6cqw; padding: 1.4cqw; overflow: hidden; border-radius: 1.4cqw; background: var(--g-850); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.aMsg { margin: .6cqw .4cqw 0; color: var(--text-secondary); font-size: 1.35cqw; }
+.aTool { display: flex; align-items: center; gap: .9cqw; height: 3.6cqw; padding: 0 1.1cqw; flex: none; border-radius: .8cqw; background: var(--g-800); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text-secondary); font-size: 1.2cqw; }
+.aTool i { width: 1cqw; aspect-ratio: 1; border-radius: 50%; background: var(--success); }
+.aTool b { margin-left: auto; color: var(--text-muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.aComposer { display: flex; align-items: center; height: 4.4cqw; flex: none; margin-top: auto; padding: 0 1.2cqw; border-radius: .9cqw; background: var(--g-950); box-shadow: var(--well-shadow); color: var(--text-faint); font-size: 1.25cqw; }
+
+.aTimeline { position: relative; grid-column: 1 / -1; display: grid; grid-template-rows: 1.6cqw 1fr 1fr; gap: .9cqw; margin: 0 1.6cqw; padding: 1.1cqw 1.6cqw 1.4cqw; border-radius: 1.4cqw; background: var(--g-850); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.aRuler { display: flex; justify-content: space-between; padding-right: 20%; color: var(--text-faint); font-family: var(--font-mono); font-size: 1.05cqw; font-variant-numeric: tabular-nums; }
+.aRuler i { font-style: normal; }
+.aTrack { position: relative; border-radius: .6cqw; background: var(--g-800); }
+.aTrack i { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 1cqw; border-radius: .6cqw; font-size: 1.15cqw; font-style: normal; font-weight: 500; white-space: nowrap; overflow: hidden; }
+.aClip { left: 0; right: 20%; background: var(--clip-bg); box-shadow: var(--clip-shadow); color: #fff; }
+.aZoom { background: var(--g-600); box-shadow: inset 0 1px 0 rgb(255 255 255 / .08); color: var(--g-200); font-variant-numeric: tabular-nums; }
+.aPlayhead { position: absolute; top: .9cqw; bottom: 1cqw; left: 36%; width: .25cqw; border-radius: 1px; background: var(--g-50); box-shadow: 0 0 0 1px rgb(0 0 0 / .4); }
+.aPlayhead::before { content: ""; position: absolute; top: 0; left: 50%; width: 1.2cqw; height: 1.2cqw; translate: -50% 0; border-radius: .3cqw; background: var(--g-50); }
+
+/* ── Card ── */
+.card { display: flex; flex-direction: column; gap: var(--space-1-5); padding: 0; border: 0; background: none; color: var(--text-secondary); text-align: left; }
+.thumb { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: var(--radius-lg); box-shadow: var(--card-shadow); transition: box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
+.thumb::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
+.card:hover .thumb { box-shadow: var(--card-shadow-hover); }
+.card:active .thumb { transform: scale(.98); }
+.card[aria-pressed="true"] .thumb { box-shadow: 0 0 0 1.5px var(--g-50), 0 0 0 4px rgb(255 255 255 / .08); }
+.cardName { color: var(--foreground); font-size: var(--text-sm); font-weight: var(--weight-medium); }

@@ -1,0 +1,19 @@
+[package]
+name = "spontaneous-capture"
+version = "0.1.0"
+description = "Screen, audio and input capture for Spontaneous (ScreenCaptureKit)"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true
+thiserror.workspace = true
+screencapturekit = { version = "11.1.1", features = ["macos_15_0"] }
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSData", "NSDictionary", "NSString", "NSGeometry"] }
+objc2-app-kit = { version = "0.3", features = ["NSCursor", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphics"] }
+objc2-av-foundation = { version = "0.3", features = ["AVCaptureDevice", "AVMediaFormat", "block2"] }
+block2 = "0.6"

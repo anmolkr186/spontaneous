@@ -1,0 +1,264 @@
+/* Spontaneous tokens.
+ *
+ * Everything visual derives from the mark: a graphite tile (#303030 → #060606)
+ * carrying light, bevelled cells (#fbfbfb → #bdbdbd) lit from the top left.
+ * The interface reuses that as its material:
+ *
+ *   panel  flat graphite, no depth (the tile)
+ *   key    a dark machined key: lit top edge, shaded bottom edge
+ *   face   the light cell from the mark: reserved for the one primary action on a surface
+ *   well   an inset groove that inputs and switches sit in
+ *   dock   a floating slab that holds keys and wells
+ *
+ * Signal colors, one meaning each: ink (your annotations), rec (recording),
+ * and clip (recorded footage on the timeline).
+ * Dark by default: footage reads best against a neutral surround that doesn't compete with it.
+ */
+
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+:root {
+  color-scheme: dark;
+
+  /* ── Graphite ramp ───────────────────────────────────────────── */
+  --g-950: #060607;
+  --g-900: #0a0a0b;
+  --g-850: #0f0f11;
+  --g-800: #141416;
+  --g-750: #1a1a1d;
+  --g-700: #212124;
+  --g-650: #29292d;
+  --g-600: #333338;
+  --g-500: #4a4a51;
+  --g-400: #6e6e76;
+  --g-300: #9b9ba3;
+  --g-200: #c5c5cb;
+  --g-100: #e4e4e8;
+  --g-50: #f7f7f8;
+
+  /* ── Signals ─────────────────────────────────────────────────── */
+  --ink: #f0b444;            /* your marks: notes, ink, pins */
+  --ink-soft: rgb(240 180 68 / .14);
+  --rec: #ff5a4f;            /* recording, destructive */
+  --rec-soft: rgb(255 90 79 / .14);
+  --clip: #2f6dff;            /* recorded footage on the timeline and scrub bar */
+  --clip-bg: linear-gradient(180deg, #4b82ff 0%, #2f6dff 55%, #2459d9 100%);
+  --clip-shadow:
+    inset 0 1px 0 rgb(255 255 255 / .28),
+    inset 0 -1px 0 rgb(0 0 0 / .3),
+    0 0 0 .5px rgb(0 0 0 / .6),
+    0 1px 2px rgb(0 0 0 / .4);
+
+  /* ── Semantic color ──────────────────────────────────────────── */
+  --background: var(--g-900);
+  --surface: var(--g-850);          /* panels */
+  --surface-raised: var(--g-800);   /* cards on panels */
+  --surface-muted: var(--g-750);    /* selected rows, hovered cards */
+  --stage: var(--g-950);
+  --foreground: #ececef;
+  --text-secondary: var(--g-300);
+  --text-muted: var(--g-400);
+  --text-faint: var(--g-500);
+  --border: rgb(255 255 255 / .07);
+  --border-subtle: rgb(255 255 255 / .045);
+  --border-strong: rgb(255 255 255 / .13);
+  --hover: rgb(255 255 255 / .04);
+  --pressed: rgb(255 255 255 / .065);
+  --accent: var(--g-200);
+  --accent-strong: var(--g-100);
+  --accent-subtle: rgb(255 255 255 / .1);
+  --danger: var(--rec);
+  --success: #8fd3a8;
+  --warning: var(--ink);
+
+  /* Controls (switches, sliders, scrubbers). On = the light face, thumb = graphite. */
+  --control-on: var(--g-100);
+  --control-glyph: var(--g-900);
+  --control-fill: var(--g-200);
+  --control-track: var(--g-650);
+  --control-track-hover: var(--g-600);
+  --control-thumb: var(--g-50);
+  --control-thumb-on: var(--g-850);
+  --control-thumb-shadow: 0 0 0 .5px rgb(0 0 0 / .5), 0 1px 2px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .25);
+
+  /* ── Materials ───────────────────────────────────────────────── */
+  --key-bg: linear-gradient(180deg, #232327 0%, #1b1b1e 100%);
+  --key-bg-hover: linear-gradient(180deg, #28282c 0%, #1f1f22 100%);
+  --key-bg-on: linear-gradient(180deg, #2f2f34 0%, #252529 100%);
+  --key-shadow:
+    inset 0 1px 0 rgb(255 255 255 / .07),
+    inset 0 -1px 0 rgb(0 0 0 / .4),
+    0 0 0 .5px rgb(0 0 0 / .7),
+    0 1px 2px rgb(0 0 0 / .45);
+  --key-shadow-pressed:
+    inset 0 1px 2px rgb(0 0 0 / .55),
+    inset 0 0 0 .5px rgb(0 0 0 / .7);
+
+  --face-bg: linear-gradient(180deg, #fbfbfb 0%, #dedede 55%, #c4c4c4 100%);
+  --face-fg: #111113;
+  --face-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 rgb(0 0 0 / .16),
+    0 0 0 .5px rgb(0 0 0 / .6),
+    0 1px 2px rgb(0 0 0 / .45),
+    0 4px 10px rgb(0 0 0 / .3);
+  --face-shadow-pressed:
+    inset 0 1px 2px rgb(0 0 0 / .25),
+    0 0 0 .5px rgb(0 0 0 / .6);
+
+  --well-bg: rgb(0 0 0 / .3);
+  --well-shadow:
+    inset 0 1px 2px rgb(0 0 0 / .5),
+    inset 0 0 0 1px rgb(255 255 255 / .025),
+    0 1px 0 rgb(255 255 255 / .03);
+
+  --dock-bg: linear-gradient(180deg, #1d1d21 0%, #141417 100%);
+  /* Kept tight on purpose: floating windows are transparent, so a long shadow
+     would be clipped by the window edge. Max reach: 22px down, 16px sideways. */
+  --dock-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / .06),
+    inset 0 1px 0 rgb(255 255 255 / .05),
+    0 0 0 .5px rgb(0 0 0 / .7),
+    0 1px 2px rgb(0 0 0 / .3),
+    0 6px 16px rgb(0 0 0 / .32);
+
+  --card-shadow: inset 0 0 0 1px var(--border-subtle), inset 0 1px 0 rgb(255 255 255 / .025);
+  --card-shadow-hover: inset 0 0 0 1px var(--border), inset 0 1px 0 rgb(255 255 255 / .035);
+
+  /* Legacy elevation names used by the base controls. */
+  --shadow-resting: 0 1px 2px rgb(0 0 0 / .3);
+  --shadow-raised: var(--dock-shadow);
+  --shadow-floating: var(--dock-shadow);
+
+  /* ── Space: a 4px grid ───────────────────────────────────────── */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── Radius: concentric. Inner = outer − padding. ────────────── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-pill: 999px;
+  --dock-pad: 4px;
+  --radius-dock: 12px;
+  --radius-key: calc(var(--radius-dock) - var(--dock-pad)); /* 8px: keys nest in the dock */
+  --radius-control: var(--radius-md);
+  --radius-panel: var(--radius-xl);
+  --radius-surface: var(--radius-2xl);
+
+  /* ── Sizes ───────────────────────────────────────────────────── */
+  --control-height-sm: 24px;
+  --control-height-md: 28px;
+  --control-height-lg: 34px;
+  --key-size: 32px;
+  --titlebar: 44px;
+  --inspector: 280px;
+  --sidepanel: 360px;
+  --timeline: 248px;
+  --track: 26px;
+
+  /* ── Type ────────────────────────────────────────────────────── */
+  --font-body: "Geist Variable", -apple-system, system-ui, sans-serif;
+  --font-display: var(--font-body);
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", monospace;
+  --text-2xs: 10.5px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 19px;
+  --text-2xl: 24px;
+  --text-3xl: 32px;
+  --leading-tight: 1.2;
+  --leading-body: 1.5;
+  --tracking-body: -.003em;
+  --tracking-display: -.025em;
+  --weight-regular: 420;
+  --weight-medium: 520;
+  --weight-strong: 600;
+
+  /* ── Motion ──────────────────────────────────────────────────── */
+  --ease-enter: cubic-bezier(.16, 1, .3, 1);
+  --ease-standard: cubic-bezier(.22, 1, .36, 1);
+  --ease-exit: cubic-bezier(.7, 0, .84, 0);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --duration-instant: 120ms;
+  --duration-fast: 160ms;
+  --duration-standard: 240ms;
+  --duration-considered: 480ms;
+  /* Reveal and collapse: popovers, tooltips, sheets. The reveal curve front-loads
+     like a critically damped spring and settles without overshoot; collapse is
+     shorter and accelerates out, so dismissing always feels quicker than opening. */
+  --ease-reveal: cubic-bezier(.16, 1, .3, 1);
+  --reveal-duration: 220ms;
+  --ease-collapse: cubic-bezier(.4, 0, 1, 1);
+  /* Sidebars: a spring with a 2% overshoot, sampled into linear() so it runs on the compositor's clock. */
+  --ease-panel: linear(0, .048, .161, .301, .446, .58, .697, .792, .867, .922, .962, .989, 1.005, 1.015, 1.019, 1.02, 1.019, 1.016, 1.013, 1.01, 1.008, 1.006, 1.004, 1.002, 1.001, 1.001, 1, 1);
+  --panel-duration: 460ms;
+  --collapse-duration: 110ms;
+
+  /* Neutral aliases some base controls read. */
+  --neutral-0: var(--g-50);
+  --neutral-2: var(--g-100);
+  --neutral-7: var(--g-400);
+  --neutral-8: var(--g-300);
+  --neutral-11: var(--g-900);
+}
+
+/* ── Base ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+html {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: var(--weight-regular);
+  /* Numbers that change (times, counts, values) must not shift width as they update. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body {
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+input, textarea, [contenteditable] { user-select: text; -webkit-user-select: text; }
+button { font: inherit; color: inherit; cursor: default; }
+::selection { background: rgb(240 180 68 / .28); }
+
+/* Keyboard focus only. Pointer focus never draws a ring; text fields show focus with their caret. */
+:focus:not(:focus-visible),
+:is(input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, [contenteditable], [tabindex="-1"]):focus { outline: none !important; }
+:focus-visible:not(input, textarea, [contenteditable], [tabindex="-1"]) {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, rgb(236 236 239 / .55)) !important;
+  outline-offset: var(--focus-outline-offset, 2px) !important;
+}
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

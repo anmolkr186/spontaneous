@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Spontaneous records your voice for voiceovers and voice notes.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Spontaneous can add your camera to recordings.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Spontaneous records system audio along with your screen.</string>
+</dict>
+</plist>
