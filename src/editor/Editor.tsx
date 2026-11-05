@@ -5,14 +5,14 @@ import { ChevronDown, Clapperboard, Film, PanelLeftClose, PanelLeftOpen, PanelRi
 import { Slider } from "@/ui/base/slider/slider";
 import { Switch } from "@/ui/base/switch/switch";
 import { ScrubInput } from "@/ui/base/scrub-input/scrub-input";
-import { Cell, IconKey, Key, Mark, Timecode } from "@/ui/atoms";
-import { Field, Group, Hint, NoteCard, Panel, SwatchPicker, Switcher } from "@/ui/molecules";
+import { Cell, IconKey, Key, Mark, Tag, Timecode } from "@/ui/atoms";
+import { Field, Group, Hint, MenuSelect, NoteCard, Panel, SwatchPicker, Switcher } from "@/ui/molecules";
 import { EXTRA_TONES, ScreenArt, ShotCard, ShotScene, standInTone } from "@/ui/organisms/shot";
 import { AnnotationLayer, Callout, Camera, CanvasViewport, Cursor, DeviceFrame, VideoScreen, stageStyles, useElementSize } from "@/ui/organisms/stage";
 import type { DeviceKind } from "@/ui/organisms/stage";
 import { AnnotationDock, Dock, DockDivider, DockTool } from "@/ui/organisms/dock";
 import { ClipItem, NoteMarker, Timeline, Track, TrackItem, Transport, Waveform, fitPps } from "@/ui/organisms/timeline";
-import { AgentQueue, AgentThread, SuggestionChips } from "@/ui/organisms/agent";
+import { AgentConnect, AgentEmpty, AgentQueue, AgentThread, SuggestionChips } from "@/ui/organisms/agent";
 import { AgentRuntimeProvider, useAgentStoreRuntime } from "@/ui/organisms/agent/runtime";
 import type { AgentMessage, AppendMessage } from "@/ui/organisms/agent/runtime";
 import { capture } from "@/platform/capture";
@@ -25,6 +25,7 @@ import type { Aspect, BackdropSet, Project } from "./model";
 import { activeZoom, useEditor } from "./store";
 import type { EditorMode, InspectorTab } from "./store";
 import { useAgent } from "./agent";
+import { AGENT_EFFORTS, AGENT_MODELS } from "./agent-stream";
 import { cursorAtTime, projectFromRecording } from "./recording";
 import styles from "./editor.module.css";
 
@@ -33,6 +34,7 @@ export function Editor() {
   useShortcuts();
   useRecordingEvents();
   useAutosave();
+  useAgentConnection();
   const runtime = useAgentRuntime();
   const mode = useEditor((s) => s.mode);
   const hasRecording = useEditor((s) => !!s.project.recording);
@@ -108,6 +110,19 @@ function useAgentRuntime() {
 }
 
 /**
+ * Checks the CLI on load and when the window comes back, which is when a browser
+ * sign-in or a fresh install would have changed things.
+ */
+function useAgentConnection() {
+  useEffect(() => {
+    const check = () => { if (useAgent.getState().connection.phase !== "ready") void useAgent.getState().checkConnection(); };
+    check();
+    window.addEventListener("focus", check);
+    return () => window.removeEventListener("focus", check);
+  }, []);
+}
+
+/**
  * A finished recording becomes the open project. The app holds the last one, so
  * the editor asks for it on load and whenever its window comes back, as well as
  * listening for the event: a reload or a hidden, throttled window never misses it.
@@ -119,8 +134,7 @@ function useRecordingEvents() {
       const { project, loadProject } = useEditor.getState();
       if (project.recording?.projectDir === summary.projectDir) return;
       loadProject(projectFromRecording(summary, project));
-      useAgent.getState().cancel();
-      useAgent.setState({ messages: [] });
+      useAgent.getState().reset();
     };
     const pull = () => void capture.lastFinished().then(open).catch(() => {});
     pull();
@@ -617,15 +631,20 @@ function SidePanel() {
   const setSide = useEditor((s) => s.setSide);
   const notes = useEditor((s) => s.project.notes);
   const running = useAgent((s) => s.running);
+  const connection = useAgent((s) => s.connection);
+  const billedElsewhere = useAgent((s) => s.billedElsewhere);
   const open = notes.filter((n) => n.status === "open").length;
   const shown = useEditor((s) => s.panels.right);
+  const label = billedElsewhere ? "Not using your plan"
+    : connection.phase === "ready" ? "Claude Code"
+    : connection.phase === "checking" ? "Checking" : "Not connected";
   return (
     <Panel className={styles.side} inert={!shown} header={
       <>
         <Switcher label="Side panel" value={side} onChange={setSide} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: open }]} />
         <span className={styles.status}>
           <Cell variant={running ? "solid" : "muted"} size={6} className={running ? styles.working : undefined} />
-          {running ? "Working" : "Claude Code"}
+          {running ? "Working" : label}
         </span>
       </>
     }>
@@ -635,6 +654,15 @@ function SidePanel() {
 }
 
 function AgentPane() {
+  const connection = useAgent((s) => s.connection);
+  if (connection.phase !== "ready") {
+    const { checkConnection, signIn } = useAgent.getState();
+    return <AgentConnect phase={connection.phase} error={connection.phase === "signing-in" ? connection.error : undefined} onSignIn={signIn} onCheck={checkConnection} />;
+  }
+  return <AgentConversation />;
+}
+
+function AgentConversation() {
   const notes = useEditor((s) => s.project.notes);
   const running = useAgent((s) => s.running);
   const queue = useAgent((s) => s.queue);
@@ -644,7 +672,7 @@ function AgentPane() {
   const items = useMemo(() => {
     if (running || queue.length) return [];
     const list = [];
-    if (open.length) list.push({ id: "apply", label: open.length === 1 ? "Apply open note" : `Apply ${open.length} open notes`, onSelect: () => applyNotes() });
+    if (open.length) list.push({ id: "apply", label: isTauri ? (open.length === 1 ? "Plan open note" : `Plan ${open.length} open notes`) : open.length === 1 ? "Apply open note" : `Apply ${open.length} open notes`, onSelect: () => applyNotes() });
     list.push({ id: "launch", label: "Draft a launch cut", onSelect: () => send("Draft a launch cut from these clips") });
     return list;
   }, [open.length, running, queue.length, applyNotes, send]);
@@ -653,7 +681,29 @@ function AgentPane() {
       suggestions={<SuggestionChips items={items} />}
       queue={<AgentQueue items={queue} waiting={waiting} onRemove={dequeue} />}
       onUndo={undo}
+      empty={isTauri ? <AgentEmpty>Talk through your notes with Claude Code. It can't change the timeline yet.</AgentEmpty> : undefined}
+      composerMeta={<AgentChoices />}
     />
+  );
+}
+
+/** Model and effort for the next message. The labels stay short so both fit beside the send key. */
+function AgentChoices() {
+  const model = useAgent((s) => s.model);
+  const modelChoice = useAgent((s) => s.modelChoice);
+  const effortChoice = useAgent((s) => s.effortChoice);
+  const { setModelChoice, setEffortChoice } = useAgent.getState();
+  const effort = AGENT_EFFORTS.find((e) => e.value === effortChoice);
+  const picked = AGENT_MODELS.find((m) => m.value === modelChoice);
+  const plan = useAgent((s) => (s.connection.phase === "ready" ? s.connection.plan : null));
+  return (
+    <>
+      <MenuSelect label="Model" display={model ?? picked?.label ?? "Default model"} value={modelChoice ?? "default"} options={AGENT_MODELS}
+        onChange={(v) => setModelChoice(v === "default" ? null : v)} />
+      <MenuSelect label="Effort" display={effort ? effort.label : "Default effort"} hint={effort ? undefined : "Uses the model's own default"} value={effortChoice ?? "default"} options={AGENT_EFFORTS}
+        onChange={(v) => setEffortChoice(v === "default" ? null : v)} />
+      {plan && <Tag size="sm" title={`Runs on your Claude ${plan} plan`}>{plan.charAt(0).toUpperCase() + plan.slice(1)}</Tag>}
+    </>
   );
 }
 
@@ -683,7 +733,7 @@ function NotesPane() {
           </span>
           {working.length > 0 && <Key size="sm" variant="tertiary" onClick={() => setSide("agent")}>Watch</Key>}
           <Key size="sm" variant="primary" disabled={!open.length} onClick={() => applyNotes()}>
-            {open.length > 1 ? `Apply ${open.length}` : "Apply"}
+            {isTauri ? (open.length > 1 ? `Plan ${open.length}` : "Plan") : open.length > 1 ? `Apply ${open.length}` : "Apply"}
           </Key>
         </div>
       )}

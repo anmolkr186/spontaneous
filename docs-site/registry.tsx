@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Mic, Monitor, Redo2, Scissors, Undo2 } from "lucide-react";
 import { Cell, IconKey, Kbd, Key, Label, Mark, Meter, Tag, Timecode } from "@/ui/atoms";
-import { Field, Group, Hint, NoteCard, SourceKey, SwatchPicker, Switcher, ToggleKey } from "@/ui/molecules";
+import { Field, Group, Hint, MenuSelect, NoteCard, SourceKey, SwatchPicker, Switcher, ToggleKey } from "@/ui/molecules";
 import { ScreenArt, ShotCard } from "@/ui/organisms/shot";
 import { SHOTS } from "@/editor/shots";
 import shotSrc from "@/ui/organisms/shot/index.tsx?raw";
@@ -67,6 +67,12 @@ const demoThread: AgentMessage[] = [
     ],
   },
 ];
+
+function MenuSelectDemo() {
+  const [effort, setEffort] = useState("high");
+  const options = [{ value: "low", label: "Low" }, { value: "high", label: "High" }, { value: "max", label: "Max" }];
+  return <MenuSelect label="Effort" display={options.find((o) => o.value === effort)!.label} value={effort} options={options} onChange={setEffort} />;
+}
 
 function SwitcherDemo() {
   const [mode, setMode] = useState<"lite" | "studio">("lite");
@@ -321,6 +327,20 @@ export const ENTRIES: DocEntry[] = [
     ],
     whenToUse: ["Icon-only controls, shortcuts, and disabled reasons."],
     whenNot: ["Information people need to complete a task. Put it in the UI."],
+  },
+  {
+    id: "menu-select", name: "MenuSelect", layer: "Molecules",
+    description: "A quiet text trigger that opens a list of options above it. Use it for settings beside a control, like the composer's model and effort.",
+    demo: () => <MenuSelectDemo />,
+    usage: `<MenuSelect label="Effort" display="High" value={effort} onChange={setEffort}\n  options={[{ value: "low", label: "Low" }, { value: "high", label: "High" }]} />`,
+    source: moleculesSrc, sourcePath: "src/ui/molecules/index.tsx",
+    props: [
+      { name: "label", type: "string", description: "Names the setting, for the menu heading and screen readers." },
+      { name: "display", type: "string", description: "The trigger's text. It can say more than the option's label, like the exact model version." },
+      { name: "options", type: "{ value, label }[]", description: "The choices, shown as a single-select list." },
+      { name: "hint", type: "string", description: "A tooltip on the trigger that explains the current choice, like what Default means." },
+    ],
+    whenToUse: ["A setting beside a control, where a Switcher would take too much room.", "For 2 to 5 short options with space to show them, use Switcher."],
   },
   {
     id: "switcher", name: "Switcher", layer: "Molecules",

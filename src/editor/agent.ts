@@ -6,6 +6,9 @@ import { useEditor } from "./store";
 import { isTauri } from "@/platform/tauri";
 import { SHOTS, shotById } from "./shots";
 import type { Shot } from "./shots";
+import { agent } from "@/platform/agent";
+import type { AgentEvent } from "@/platform/agent";
+import { AGENT_MODELS, modelName, reduceParts } from "./agent-stream";
 
 /** Read a camera request from plain language. The real agent does this with tools; this is the scripted stand-in. */
 function parseShotRequest(text: string): { shot?: Shot; speed?: number; amount?: number } | null {
@@ -17,13 +20,12 @@ function parseShotRequest(text: string): { shot?: Shot; speed?: number; amount?:
 }
 
 /**
- * Phase 1 stand-in for the Claude Code sidecar.
+ * In the app, runs go to the user's Claude Code CLI: Rust spawns it, batches
+ * stdout every 16 ms onto a Channel, and this store folds stream-json events
+ * into thread messages. It has no edit tools yet, so a run can only reply.
  *
- * The real flow (phase 4): Rust spawns `claude -p --input-format stream-json …`,
- * batches stdout every 16 ms onto a Channel, and this store converts stream-json
- * events into thread messages. Tool calls arrive as MCP calls handled in
- * Rust, which applies them as undoable commands. Here we script that run so the
- * UI can be built against the same message shapes.
+ * In a plain browser there's no CLI, so runs are scripted against the same
+ * message shapes and the UI can be built without one.
  */
 
 type Part = Exclude<ThreadMessageLike["content"], string>[number];
@@ -47,7 +49,28 @@ export interface QueuedRun {
 /** A note as the thread shows it: its pin number and text, so the thread never reads the project. */
 export type NoteRef = { id: string; index: number; at: number; text: string };
 
+/** Where the connection to the user's Claude Code stands. The app never holds the login itself. */
+export type AgentConnection =
+  | { phase: "checking" | "missing" | "signed-out" }
+  | { phase: "signing-in"; error?: string }
+  | { phase: "ready"; plan: string | null };
+
 interface AgentState {
+  connection: AgentConnection;
+  /** The model the CLI reported, as a display name. */
+  model: string | null;
+  /** What the user picked, as a CLI alias or level. Null leaves it to the CLI's default. */
+  modelChoice: string | null;
+  effortChoice: string | null;
+  /** Takes effect from the next message, on the same conversation. */
+  setModelChoice: (value: string | null) => void;
+  setEffortChoice: (value: string | null) => void;
+  /** Set when a session runs on something other than the plan login, which would bill elsewhere. */
+  billedElsewhere: boolean;
+  checkConnection: () => Promise<void>;
+  signIn: () => Promise<void>;
+  /** Forget the conversation, for a new project. */
+  reset: () => void;
   messages: Msg[];
   running: boolean;
   /** Runs waiting their turn, oldest first. They start when the agent is free and not waiting on you. */
@@ -68,6 +91,40 @@ interface AgentState {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let runToken = 0;
+
+/** The CLI session, kept so a stopped run can be resumed. A new generation disowns the old process's events. */
+let sessionId: string | null = null;
+let sessionOpen = false;
+let sessionGeneration = 0;
+/** Runs when the current live run ends, however it ends. */
+let onRunEnd: (() => void) | null = null;
+let signInAttempt = 0;
+/** The CLI takes its model and effort at launch, so a new choice restarts it on the same conversation. */
+let sessionStale = false;
+
+const CHOICES_KEY = "spontaneous.agent";
+
+function loadChoices(): { modelChoice: string | null; effortChoice: string | null } {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CHOICES_KEY) ?? "{}");
+    return { modelChoice: saved.modelChoice ?? null, effortChoice: saved.effortChoice ?? null };
+  } catch {
+    return { modelChoice: null, effortChoice: null };
+  }
+}
+
+function saveChoices(choices: { modelChoice: string | null; effortChoice: string | null }) {
+  try { localStorage.setItem(CHOICES_KEY, JSON.stringify(choices)); } catch { /* storage unavailable */ }
+}
+
+/** The prompt for a batch of notes: where each one sits and what it says. */
+function notesPrompt(notes: Note[]): string {
+  const lines = notes.map((n, i) => {
+    const where = n.region ? ` on the area at x ${n.region.x.toFixed(2)}, y ${n.region.y.toFixed(2)}, w ${n.region.w.toFixed(2)}, h ${n.region.h.toFixed(2)} of the frame` : "";
+    return `${i + 1}. At ${formatTime(n.at)}${where}: ${n.text || "(marked on the frame, no text)"}`;
+  });
+  return `Here are my notes on the recording:\n${lines.join("\n")}`;
+}
 
 /** Pin numbers match the Notes list: notes in time order, dismissed ones left out. */
 function noteRefs(ids: string[]): NoteRef[] {
@@ -171,6 +228,63 @@ export const useAgent = create<AgentState>((set, get) => {
     pump();
   }
 
+  function endLiveRun(token: number, problem?: string) {
+    const end = onRunEnd;
+    onRunEnd = null;
+    end?.();
+    if (token !== runToken) return;
+    if (problem) pushPart({ type: "text", text: problem } as Part);
+    patchLast((m) => ({ ...m, status: problem ? { type: "incomplete", reason: "error" } : { type: "complete", reason: "stop" } }));
+    set({ running: false });
+    pump();
+  }
+
+  function onEvents(events: AgentEvent[], generation: number) {
+    if (generation !== sessionGeneration) return;
+    const token = runToken;
+    for (const event of events) {
+      if (event.type === "system" && event.subtype === "init") {
+        sessionId = event.session_id as string;
+        set({ model: modelName(event.model as string), billedElsewhere: event.apiKeySource !== "none" });
+      } else if (event.type === "stream_event" || event.type === "assistant") {
+        if (get().running) patchLast((m) => ({ ...m, content: reduceParts(m.content as Part[], event) }));
+      } else if (event.type === "result") {
+        if (!get().running) continue;
+        const failed = event.is_error === true;
+        endLiveRun(token, failed ? String(event.result ?? "Claude Code couldn't finish that.") : undefined);
+        if (failed) void get().checkConnection();
+      } else if (event.type === "agent_exit") {
+        sessionOpen = false;
+        if (get().running) {
+          // It may have died resuming, so the next message starts a fresh session rather than failing the same way.
+          sessionId = null;
+          const detail = String(event.stderr ?? "").trim().split("\n").at(-1);
+          endLiveRun(token, detail ? `Claude Code stopped: ${detail}` : "Claude Code stopped before it replied.");
+          void get().checkConnection();
+        }
+      }
+    }
+  }
+
+  /** Send a prompt to the CLI for the run `start` just opened, starting a session if none is up. */
+  function sendLive(prompt: string, token: number) {
+    void (async () => {
+      try {
+        if (!sessionOpen || sessionStale) {
+          const generation = ++sessionGeneration;
+          const { modelChoice, effortChoice } = get();
+          await agent.connect({ resume: sessionId, model: modelChoice, effort: effortChoice }, (events) => onEvents(events, generation));
+          sessionOpen = true;
+          sessionStale = false;
+        }
+        await agent.send(prompt);
+      } catch (error) {
+        sessionOpen = false;
+        endLiveRun(token, String(error));
+      }
+    })();
+  }
+
   /** Start the next queued run if the agent is free. */
   function pump() {
     const { running, queue } = get();
@@ -228,6 +342,18 @@ export const useAgent = create<AgentState>((set, get) => {
     if (!notes.length) { pump(); return; }
     const refs = noteRefs(notes.map((n) => n.id));
     const batch = notes.length > 1;
+    if (isTauri) {
+      // No edit tools yet: the agent says what it would do and the notes stay open.
+      const token = start(batch ? `Plan ${notes.length} notes` : notes[0]!.text, refs);
+      const editor = useEditor.getState();
+      for (const n of notes) editor.setNoteStatus(n.id, "applying");
+      onRunEnd = () => {
+        const current = useEditor.getState();
+        for (const n of current.project.notes) if (notes.some((o) => o.id === n.id) && n.status === "applying") current.setNoteStatus(n.id, "open");
+      };
+      sendLive(notesPrompt(notes), token);
+      return;
+    }
     const token = start(batch ? `Apply ${notes.length} notes` : notes[0]!.text, refs);
     void (async () => {
       // A batch gets a checklist that ticks off as each note lands.
@@ -253,6 +379,7 @@ export const useAgent = create<AgentState>((set, get) => {
 
   function runSend(text: string) {
     const token = start(text);
+    if (isTauri) { sendLive(text, token); return; }
     void (async () => {
       if (/launch|cut|trailer/i.test(text)) {
         await streamText("reasoning", "A launch cut needs a direction before I touch the timeline. I'll ask instead of guessing.", token);
@@ -292,14 +419,71 @@ export const useAgent = create<AgentState>((set, get) => {
     pump();
   };
 
+  /** Runs need a signed-in CLI. If there isn't one, show the sign-in card instead of queuing. */
+  const connected = () => {
+    if (get().connection.phase === "ready") return true;
+    useEditor.getState().setSide("agent");
+    return false;
+  };
+
   return {
+    connection: isTauri ? { phase: "checking" } : { phase: "ready", plan: "max" },
+    model: isTauri ? null : AGENT_MODELS.find((m) => m.value === loadChoices().modelChoice)?.label ?? "Opus 5.5",
+    ...loadChoices(),
+    billedElsewhere: false,
+
+    setModelChoice: (modelChoice) => {
+      sessionStale = true;
+      // Until the CLI reports the exact version, show the family that was picked.
+      set({ modelChoice, model: AGENT_MODELS.find((m) => m.value === modelChoice)?.label ?? null });
+      saveChoices({ modelChoice, effortChoice: get().effortChoice });
+    },
+
+    setEffortChoice: (effortChoice) => {
+      sessionStale = true;
+      set({ effortChoice });
+      saveChoices({ modelChoice: get().modelChoice, effortChoice });
+    },
+
+    checkConnection: async () => {
+      if (!isTauri) return;
+      const status = await agent.status();
+      if (!status) return;
+      if (!status.installed) set({ connection: { phase: "missing" } });
+      else if (status.loggedIn) set({ connection: { phase: "ready", plan: status.subscription } });
+      // A sign-in still open in the browser keeps its card until it finishes.
+      else if (get().connection.phase !== "signing-in") set({ connection: { phase: "signed-out" } });
+    },
+
+    signIn: async () => {
+      const attempt = ++signInAttempt;
+      set({ connection: { phase: "signing-in" } });
+      try {
+        await agent.login();
+      } catch (error) {
+        if (attempt === signInAttempt) set({ connection: { phase: "signing-in", error: String(error) } });
+        return;
+      }
+      // Starting a new sign-in ends the old one, which isn't the user finishing.
+      if (attempt !== signInAttempt) return;
+      set({ connection: { phase: "checking" } });
+      await get().checkConnection();
+    },
+
+    reset: () => {
+      get().cancel();
+      sessionId = null;
+      set({ messages: [] });
+    },
+
     messages: isTauri ? [] : seed,
     running: false,
     queue: [],
 
-    send: (text) => enqueue({ id: uid("q"), label: text, text }),
+    send: (text) => { if (connected()) enqueue({ id: uid("q"), label: text, text }); },
 
     applyNotes: (noteIds) => {
+      if (!connected()) return;
       const editor = useEditor.getState();
       const notes = editor.project.notes.filter((n) => n.status === "open" && (!noteIds || noteIds.includes(n.id)));
       if (!notes.length) return;
@@ -322,6 +506,12 @@ export const useAgent = create<AgentState>((set, get) => {
 
     cancel: () => {
       runToken++;
+      if (isTauri) {
+        onRunEnd = null;
+        sessionGeneration++;
+        if (sessionOpen) void agent.stop();
+        sessionOpen = false;
+      }
       const { messages } = get();
       if (messages.at(-1)?.role === "assistant") patchLast((m) => ({ ...m, status: { type: "incomplete", reason: "cancelled" } }));
       const editor = useEditor.getState();

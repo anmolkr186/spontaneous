@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from "react";
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import { motion } from "motion/react";
-import { Check, Clock3, Mic, Pause, X } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Check, ChevronDown, Clock3, Mic, Pause, X } from "lucide-react";
 import { Key, Tag } from "@/ui/atoms";
 import { Tooltip } from "@/ui/base/tooltip/tooltip";
 import type { Note } from "@/editor/model";
@@ -66,6 +67,36 @@ export function Switcher<T extends string>({ options, value, onChange, label, fu
         </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * A quiet text trigger that opens a list of options above it. `display` can say
+ * more than the option's label, and `hint` explains the current choice on hover.
+ */
+export function MenuSelect({ label, display, hint, value, options, onChange }: { label: string; display: string; hint?: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
+  const trigger = (
+    <DropdownMenu.Trigger className={styles.menuTrigger} aria-label={`${label}: ${display}`}>
+      {display}<ChevronDown size={12} />
+    </DropdownMenu.Trigger>
+  );
+  return (
+    <DropdownMenu.Root modal={false}>
+      {hint ? <Tooltip content={hint}>{trigger}</Tooltip> : trigger}
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content className={styles.menu} side="top" align="start" sideOffset={6} collisionPadding={8}>
+          <DropdownMenu.Label className={styles.menuLabel}>{label}</DropdownMenu.Label>
+          <DropdownMenu.RadioGroup value={value} onValueChange={onChange}>
+            {options.map((o) => (
+              <DropdownMenu.RadioItem key={o.value} value={o.value} className={styles.menuItem}>
+                {o.label}
+                <DropdownMenu.ItemIndicator className={styles.menuCheck}><Check size={13} /></DropdownMenu.ItemIndicator>
+              </DropdownMenu.RadioItem>
+            ))}
+          </DropdownMenu.RadioGroup>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 

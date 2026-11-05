@@ -3,7 +3,7 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { Composer, Message, Thread, When, useThreadState } from "./runtime";
 import type { ReasoningMessagePartComponent, TextMessagePartComponent, ToolCallMessagePartComponent, ToolCallMessagePartProps } from "./runtime";
 import { ArrowUp, Check, ChevronDown, ChevronRight, Circle, Clock3, Crosshair, Eye, Film, Gauge, Minus, Scissors, Search, Square, Type, Wand2, X, ZoomIn } from "lucide-react";
-import { Kbd, Mark } from "@/ui/atoms";
+import { Kbd, Key, Mark } from "@/ui/atoms";
 import { formatTime } from "@/editor/model";
 import styles from "./agent.module.css";
 
@@ -53,12 +53,42 @@ export function AgentThread({ suggestions, queue, empty, composerMeta, tools, on
   );
 }
 
-export function AgentEmpty() {
+export function AgentEmpty({ children = "Leave notes on the frame and the agent turns them into zooms, callouts, cuts and timing." }: { children?: ReactNode }) {
   return (
     <div className={styles.empty}>
       <Mark size={40} title="" />
       <h3>Mark it, say it, done</h3>
-      <p>Leave notes on the frame and the agent turns them into zooms, callouts, cuts and timing.</p>
+      <p>{children}</p>
+    </div>
+  );
+}
+
+export interface AgentConnectProps {
+  phase: "checking" | "missing" | "signed-out" | "signing-in";
+  error?: string;
+  onSignIn: () => void;
+  onCheck: () => void;
+}
+
+/** Stands in for the thread until the user's own Claude Code is installed and signed in. */
+export function AgentConnect({ phase, error, onSignIn, onCheck }: AgentConnectProps) {
+  if (phase === "checking") return <div className={styles.empty}><p>Checking for Claude Code…</p></div>;
+  const copy = {
+    missing: { title: "Install Claude Code", body: "Spontaneous runs your own copy of Claude Code. Install it from code.claude.com, then check again." },
+    "signed-out": { title: "Connect Claude Code", body: "Work through your notes on your own Claude plan. You sign in on Anthropic's page in your browser, and Spontaneous never sees your login." },
+    "signing-in": { title: "Finish signing in", body: "Complete the sign-in in your browser, then come back here." },
+  }[phase];
+  return (
+    <div className={styles.empty}>
+      <Mark size={40} title="" />
+      <h3>{copy.title}</h3>
+      <p>{copy.body}</p>
+      {error && <p className={styles.connectError}>{error}</p>}
+      <div className={styles.connectActions}>
+        {phase === "signed-out" && <Key size="sm" variant="primary" onClick={onSignIn}>Sign in</Key>}
+        {phase === "signing-in" && <Key size="sm" variant="tertiary" onClick={onSignIn}>Open sign-in again</Key>}
+        {phase !== "signed-out" && <Key size="sm" variant={phase === "missing" ? "primary" : "tertiary"} onClick={onCheck}>Check again</Key>}
+      </div>
     </div>
   );
 }
@@ -106,7 +136,7 @@ export function AssistantMessage({ tools }: { tools?: Record<string, ToolCallMes
         {stopped && <span className={styles.stopped}>Stopped</span>}
       </div>
       <div className={styles.assistantBody}>
-        {running && empty && <span className={styles.placeholder}><span className={styles.shimmer}>Reading the project</span></span>}
+        {running && empty && <span className={styles.placeholder}><span className={styles.shimmer}>Thinking</span></span>}
         <Message.Parts
           components={{
             Text: AgentText,

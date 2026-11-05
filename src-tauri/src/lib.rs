@@ -1,3 +1,4 @@
+mod agent;
 mod capture;
 mod project;
 mod tray;
@@ -14,6 +15,7 @@ async fn tokio_sleep() {
 pub fn run() {
   let app = tauri::Builder::default()
     .manage(capture::CaptureState::default())
+    .manage(agent::AgentState::default())
     .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(capture::on_shortcut).build())
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -79,14 +81,21 @@ pub fn run() {
       capture::capture_area_done,
       capture::open_recorder_window,
       project::project_save,
+      agent::agent_status,
+      agent::agent_login,
+      agent::agent_connect,
+      agent::agent_send,
+      agent::agent_stop,
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application");
 
   app.run(|app, event| {
     // Clicking the Dock icon with no window showing starts a new recording.
-    if let RunEvent::Reopen { has_visible_windows: false, .. } = event {
-      let _ = capture::open_recorder(app, "display");
+    match event {
+      RunEvent::Reopen { has_visible_windows: false, .. } => { let _ = capture::open_recorder(app, "display"); }
+      RunEvent::Exit => agent::shutdown(app),
+      _ => {}
     }
   });
 }

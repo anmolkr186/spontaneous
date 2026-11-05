@@ -189,11 +189,15 @@ Notes look like Flask's time-coded feedback: a pin on the timeline and a card in
 - Spawn the user's own `claude` CLI, as Monocode does:
   ```
   claude -p --input-format stream-json --output-format stream-json --verbose
-         --include-partial-messages --permission-prompt-tool stdio
-         --mcp-config <app>/mcp.json --allowedTools "mcp__spontaneous__*"
+         --include-partial-messages --tools "" --strict-mcp-config --setting-sources ""
+         --append-system-prompt <prompt>
   ```
-  This disables the built-in file and shell tools, so the agent can only act through our tools.
-- Find the CLI using the login shell's `PATH` (apps launched from Finder don't inherit it). Reap orphaned agent processes on start, and escalate SIGHUP → SIGKILL on quit.
+  `--tools ""` removes the built-in file and shell tools. `--allowedTools` wouldn't do that, because it only pre-approves tools. The MCP flags `--mcp-config <app>/mcp.json --allowedTools "mcp__spontaneous__*"` and `--permission-prompt-tool stdio` arrive with the edit tools, and whether MCP tools load alongside `--tools ""` still needs checking.
+- Sign-in belongs to the CLI. The app runs `claude auth status` and `claude auth login`, which opens Anthropic's page in the browser, and never reads or stores a credential. Anthropic doesn't allow apps to offer Claude.ai login or hold its tokens, so never add an OAuth flow or read the Keychain. Ask Anthropic before shipping this to other people.
+- Strip `ANTHROPIC_API_KEY` and the other credential variables before spawning, because in `-p` mode a key outranks the plan login. Show a warning if `apiKeySource` in the `init` event isn't `none`.
+- Never pass `--bare`, which doesn't read the plan login. It's planned to become the default for `-p`, so re-check this when updating the CLI.
+- Run in an app-owned folder, because `-p` otherwise loads hooks and `.mcp.json` from where it runs.
+- Find the CLI in the usual install locations, then through the login shell's `PATH` (apps launched from Finder don't inherit it). Stop it with SIGINT so the session can be resumed, then SIGKILL. It also exits when its stdin closes, so the app can't leave one behind.
 - Stream stdout through a 16 ms batcher into a Channel.
 
 ### MCP tools (rmcp 3.x, served in-process)

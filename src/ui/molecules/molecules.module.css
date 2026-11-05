@@ -166,3 +166,16 @@
 :global([data-force="hover"]) .switcherOption { color: var(--text-secondary); }
 :global([data-force="hover"]) .note { box-shadow: var(--card-shadow-hover); }
 :global([data-force="focus"]) .source, :global([data-force="focus"]) .toggle { outline: 2px solid rgb(236 236 239 / .55); outline-offset: 2px; }
+
+/* ── Menu select: a text trigger and a small dock of options ── */
+.menuTrigger { display: inline-flex; align-items: center; gap: var(--space-1); height: 24px; padding: 0 var(--space-1-5); border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); font-size: var(--text-xs); white-space: nowrap; }
+.menuTrigger:hover, .menuTrigger[data-state="open"] { background: var(--hover); color: var(--foreground); }
+.menuTrigger svg { flex: none; color: var(--text-muted); }
+.menu { z-index: 90; min-width: 136px; padding: var(--space-1); border-radius: var(--radius-md); background: var(--dock-bg); box-shadow: var(--dock-shadow); transform-origin: var(--radix-dropdown-menu-content-transform-origin); animation: menuIn var(--duration-fast) var(--ease-standard); }
+@keyframes menuIn { from { opacity: 0; transform: scale(.97) translateY(2px); } }
+.menuLabel { padding: var(--space-1) var(--space-2); color: var(--text-muted); font-size: var(--text-xs); }
+.menuItem { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); height: 26px; padding: 0 var(--space-2); border-radius: var(--radius-sm); outline: none; color: var(--text-secondary); font-size: var(--text-sm); cursor: default; }
+.menuItem[data-highlighted] { background: var(--hover); color: var(--foreground); }
+.menuItem[data-state="checked"] { color: var(--foreground); }
+.menuCheck { display: inline-flex; }
+@media (prefers-reduced-motion: reduce) { .menu { animation: none; } }
