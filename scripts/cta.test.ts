@@ -61,6 +61,13 @@ test("agent labels are checked", () => {
   assert.deepEqual(resolveLabel(undefined, "Run 4 edits", { intent: "run" }), { label: "Run 4 edits", source: "derived" });
 });
 
+test("stacked asks are answered in order", () => {
+  const c = (id: string, region: string, intent: Candidate["intent"], seq: number, enabled = true): Candidate => ({ id, region, intent, seq, enabled });
+  assert.deepEqual([...elect([c("replace", "panel", "decide", 1), c("delete", "panel", "decide", 2)])], ["replace"]);
+  assert.deepEqual([...elect([c("delete", "panel", "decide", 2)])], ["delete"]);
+  assert.deepEqual([...elect([c("plan", "panel", "run", 1), c("replace", "panel", "decide", 3), c("delete", "panel", "decide", 4)])], ["replace"]);
+});
+
 test("one primary per region, by intent, newest on a tie", () => {
   const c = (id: string, region: string, intent: Candidate["intent"], seq: number, enabled = true): Candidate => ({ id, region, intent, seq, enabled });
   assert.deepEqual([...elect([c("send", "panel", "run", 1), c("approve", "panel", "decide", 2)])], ["approve"]);

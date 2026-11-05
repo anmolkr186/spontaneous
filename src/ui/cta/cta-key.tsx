@@ -27,7 +27,7 @@ export interface CtaKeyProps extends Omit<KeyProps, "variant" | "children"> {
   trailing?: ReactNode;
   /** Why it's disabled, shown on hover and focus. */
   reason?: string;
-  /** Forces a role and skips the election. */
+  /** Forces a role and sits out the election, e.g. a card that's been answered. */
   role?: CtaRole;
   /** The role it takes with no CtaRegion around it. */
   fallback?: CtaRole;
@@ -43,7 +43,8 @@ export const CtaKey = forwardRef<HTMLButtonElement, CtaKeyProps>(function CtaKey
   ref,
 ) {
   const resolved = resolveLabel(proposal, label, { intent, risk, count });
-  const elected = useCtaRole(intent, !disabled, fallback);
+  // A forced role sits out the election, so a folded or decided card doesn't hold a region's primary.
+  const elected = useCtaRole(intent, !disabled && !forced, fallback);
   const role = forced ?? elected;
   useEffect(() => {
     if (resolved.rejected && import.meta.env.DEV) console.warn(`[cta] "${proposal}" → "${resolved.label}": ${resolved.rejected}`);

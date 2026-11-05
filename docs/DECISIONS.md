@@ -6,9 +6,6 @@ Each entry: **what**, **why**, **where it lives**, and the date. Dates are when 
 
 ## Open: needs a decision
 
-- **Stacked decisions: newest or oldest gets the primary?** (2026-11-06)
-  - When two agent asks are on the panel (e.g. two Approval cards), the election gives the primary to the newest (`src/ui/cta/elect.ts`, rule 3). That matches "the card that just arrived is in view". An inbox-style flow might prefer oldest first (answer in order).
-  - Revisit when the real agent can raise more than one ask per turn.
 - **Play is no longer a primary** (2026-11-06)
   - The round Play key in Lite moved from the light face to key material, because transport isn't a call to action and it competed with the surface's primary (`src/editor/Editor.tsx`, ScrubBar).
   - Confirm by eye in the app.
@@ -66,9 +63,13 @@ Each entry: **what**, **why**, **where it lives**, and the date. Dates are when 
   - Otherwise the app shows its own label from `derive.ts`, so a key is never missing or wrong.
 - **One primary per surface, by election** (2026-11-06)
   - Regions (title bar, notes, agent panel, stage) elect one primary by intent: decide > run > review > apply > finish > navigate. Dismiss is never primary.
-  - A tie goes to the candidate that most recently appeared or became enabled.
+  - Ties: decisions go oldest first; everything else goes to the candidate that most recently appeared or became enabled.
   - Export (finish) waits while any decide or run is pending anywhere. The editor also holds it while a run is going.
   - Code: `src/ui/cta`, Foundations › Actions.
+- **Stacked asks are answered oldest first** (2026-11-06)
+  - When several agent asks wait on the panel at once (e.g. two Approval cards), the oldest holds the primary and the next one rises when it's answered. ⌘↵ answers whichever card has focus; it isn't a global shortcut.
+  - Any other tie still goes to the newest, so Send beats a suggestion once you've typed (`src/ui/cta/elect.ts`, `breaksTie`).
+  - Chosen over newest first, and over showing one ask at a time with the rest folded.
 - **A destructive primary takes a red face** (2026-11-06)
   - When a destructive action holds the primary ("Delete 3 takes", "Overwrite export"), the light face becomes red with white text (`src/ui/cta/cta-key.module.css`).
   - It's the only primary that takes a hue. Red already means recording and destructive, so it stays within the signals.

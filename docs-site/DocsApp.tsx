@@ -400,7 +400,7 @@ function ActionsPage() {
     <>
       <p className={styles.lede}>Every key that moves the work forward says what it will do, and each surface shows one primary: the action that matters most right now. The app decides which; the agent may word it.</p>
       <h2 className={styles.h2}>One primary per surface</h2>
-      <p className={styles.p}>Surfaces are regions: the title bar, the notes list, the agent panel, the stage. Every key that could be primary is a <code>CtaKey</code> with an intent, and the region elects one by rank. A tie goes to the newest: the card that just arrived, or Send once you've typed. The rest step down to secondary. Export waits while any region has a decision or work pending.</p>
+      <p className={styles.p}>Surfaces are regions: the title bar, the notes list, the agent panel, the stage. Every key that could be primary is a <code>CtaKey</code> with an intent, and the region elects one by rank. When several asks wait, the oldest holds the primary, so you answer them in the order the agent asked; the next rises as each is answered. Any other tie goes to the newest: Send once you've typed beats a suggestion. The rest step down to secondary. Export waits while any region has a decision or work pending.</p>
       <table className={styles.table}>
         <thead><tr><th>Intent</th><th>Rank</th><th>When</th><th>Keys</th></tr></thead>
         <tbody>{INTENT_ROWS.map(([i, when, keys]) => <tr key={i}><td>{i}</td><td>{PRIORITY[i]}</td><td className={styles.plain}>{when}</td><td className={styles.plain}>{keys}</td></tr>)}</tbody>
