@@ -1,0 +1,127 @@
+/* PermissionRequest: a request card in the tray that folds into one decided
+   line. Both states are Folds on the same curve, so the tray's height glides
+   from one to the other. */
+
+.permission { --focus-outline-offset: 1px; --indent: calc(var(--key-size) + var(--space-2-5)); }
+
+/* A fold clips what it holds, so the card's outer ring would be cut where it
+   meets the fold's edge. The wrapper reaches into the tray's padding and the
+   content takes it back; once folded shut the top margin glides back to zero. */
+.pendingWrap { margin: calc(var(--tray-pad) * -1) calc(var(--tray-pad) * -1) 0; transition: margin-top var(--duration-fold) var(--ease-glide); }
+.pending { padding: var(--tray-pad) var(--tray-pad) 0; }
+.permission[data-decided] .pendingWrap { margin-top: 0; }
+
+.pending { transition: filter var(--duration-standard) var(--ease-standard); }
+.permission[data-decided] .pending { filter: blur(var(--blur-roll)); transition: filter var(--duration-fast) var(--ease-collapse); }
+
+/* ── Card ────────────────────────────────────────────────────── */
+.card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--tray-card-inset); }
+.header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2-5); }
+.avatar { display: grid; place-items: center; width: var(--key-size); height: var(--key-size); }
+.avatar > * { width: 100%; height: 100%; }
+.heading { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.who, .action { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who { color: var(--text-muted); font-size: var(--text-sm); line-height: 16px; }
+.agent { color: var(--text-secondary); font-weight: var(--weight-medium); }
+.model { margin-left: var(--space-1); color: var(--text-muted); }
+.model::before { content: "·"; margin-right: var(--space-1); color: var(--text-faint); }
+.action { color: var(--foreground); font-size: var(--text-base); font-weight: var(--weight-medium); line-height: 18px; }
+.risk { align-self: start; margin-top: 1px; }
+
+.target { display: flex; align-items: center; gap: var(--space-1-5); min-width: 0; margin: calc(var(--space-1) * -1) 0 0 var(--indent); color: var(--text-muted); font-size: var(--text-sm); }
+.toolIcon { display: grid; flex: none; place-items: center; }
+.toolIcon svg { width: 13px; height: 13px; stroke-width: 1.9; }
+.targetText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The agent's own words, on a rule like quoted reasoning in the thread. */
+.reason { margin: 0 0 0 var(--indent); padding-left: var(--space-2-5); box-shadow: inset 1.5px 0 0 var(--border-strong); color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.5; }
+
+/* ── What will happen ────────────────────────────────────────── */
+.preview { display: flex; flex-direction: column; padding: var(--space-2) var(--space-1) var(--space-1); border-radius: var(--radius-md); background: var(--well-bg); box-shadow: var(--well-shadow); }
+.previewTitle { margin: 0 0 var(--space-1); padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+.rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 26px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+  animation: rise var(--reveal-duration) var(--ease-reveal) calc(var(--i, 0) * var(--stagger) + 120ms) both;
+}
+.rowIcon { display: grid; flex: none; place-items: center; color: var(--text-muted); }
+.rowIcon svg { width: 13px; height: 13px; stroke-width: 1.9; }
+.rowLabel { flex: 1; min-width: 0; overflow: hidden; color: var(--foreground); text-overflow: ellipsis; white-space: nowrap; }
+.rowMeta { flex: none; color: var(--text-muted); }
+.more {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  height: 24px;
+  margin-top: var(--space-0-5);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  transition: color var(--duration-instant) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), scale var(--duration-instant) var(--ease-standard);
+}
+.more:hover { background: var(--hover); color: var(--foreground); }
+.more:active { scale: .97; }
+
+/* ── How long ────────────────────────────────────────────────── */
+.scope { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.scopeLabel { color: var(--text-muted); font-size: var(--text-sm); }
+
+/* ── Tray foot ───────────────────────────────────────────────── */
+.foot { padding-block: var(--space-1); }
+.hint { display: inline-flex; margin-right: calc(var(--space-1) * -1); }
+.faceKbd { background: rgb(0 0 0 / .07); box-shadow: inset 0 0 0 .5px rgb(0 0 0 / .14); color: rgb(17 17 19 / .6); }
+/* Destructive: no light face. A machined key that carries the rec signal instead. */
+.danger { background: linear-gradient(var(--rec-soft), var(--rec-soft)), var(--key-bg); color: var(--rec); }
+.danger:hover { background: linear-gradient(rgb(255 90 79 / .2), rgb(255 90 79 / .2)), var(--key-bg-hover); }
+@container (max-width: 340px) {
+  .hint { display: none; }
+  .target, .reason { margin-left: 0; }
+}
+
+/* ── Decided line ────────────────────────────────────────────── */
+.decided { display: flex; flex-direction: column; }
+.line { outline: none; }
+.lineBody { display: flex; flex: 1; align-items: center; gap: var(--space-1-5); min-width: 0; height: 28px; animation: rise var(--reveal-duration) var(--ease-reveal) 100ms both; }
+.mark { display: grid; flex: none; place-items: center; width: 14px; height: 14px; }
+.mark svg { width: 14px; height: 14px; overflow: visible; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.mark[data-kind="check"] svg { stroke: var(--success); }
+.mark[data-kind="cross"] svg { stroke: var(--text-secondary); }
+.mark path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw var(--duration-draw) var(--ease-standard) 220ms forwards; }
+.outcome { display: inline-flex; flex: none; color: var(--foreground); font-weight: var(--weight-medium); }
+.lineAction { min-width: 0; overflow: hidden; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.lineAction::before { content: "·"; margin-right: var(--space-1-5); color: var(--text-faint); }
+.left { flex: none; color: var(--text-muted); }
+.leftTime { color: var(--text-secondary); font-family: var(--font-mono); letter-spacing: 0; }
+
+/* A timed grant's time left: fills in once, then drains on its own clock. */
+.bar { height: 2px; margin: 0 var(--space-2-5) var(--space-1-5); overflow: hidden; border-radius: 1px; background: var(--well-bg); box-shadow: inset 0 0 0 .5px var(--border-subtle); }
+.barFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--g-400);
+  transform-origin: left center;
+  animation: barIn var(--duration-considered) var(--ease-reveal) 200ms both, drain var(--ms) linear 680ms forwards;
+}
+.bar[data-expired] .barFill { animation: none; scale: 0 1; }
+
+@keyframes rise { from { opacity: 0; translate: 0 4px; filter: blur(var(--blur-soft)); } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes barIn { from { scale: 0 1; } to { scale: var(--from) 1; } }
+@keyframes drain { from { scale: var(--from) 1; } to { scale: 0 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pending, .permission[data-decided] .pending { filter: none; }
+  .mark path { stroke-dashoffset: 0; }
+  /* The bar still says how much is left, stepping once a second instead of draining. */
+  .barFill { animation: none; scale: var(--frac) 1; }
+}

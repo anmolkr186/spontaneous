@@ -1,0 +1,142 @@
+/* ApprovalCard: a request card in the tray. The card blurs away on a decision
+   while the tray glides down to one resolved row (two Folds on the same curve,
+   so the height interpolates cleanly from one to the other). */
+
+.approval { --focus-outline-offset: 1px; }
+
+/* A fold clips what it holds, so the card's outer ring would be cut where it
+   meets the fold's edge. The wrapper reaches into the tray's padding and the
+   content takes it back; once folded shut the top margin glides back to zero. */
+.pendingWrap { margin: calc(var(--tray-pad) * -1) calc(var(--tray-pad) * -1) 0; transition: margin-top var(--duration-fold) var(--ease-glide); }
+.pending { padding: var(--tray-pad) var(--tray-pad) 0; }
+.approval[data-resolved] .pendingWrap { margin-top: 0; }
+
+/* Leaving content blurs out quicker than it came back. */
+.pending { transition: filter var(--duration-standard) var(--ease-standard); }
+.approval[data-resolved] .pending { filter: blur(var(--blur-roll)); transition: filter var(--duration-fast) var(--ease-collapse); }
+
+/* ── Countdown (tray foot, left) ─────────────────────────────
+   Ticks once a second with no motion. In the last ten seconds it turns
+   foreground and the words swap for a tag. */
+.clock { display: inline-flex; flex: none; align-items: center; color: var(--text-muted); transition: color var(--duration-standard) var(--ease-standard); }
+.clock[data-urgent] { color: var(--foreground); }
+.clockShown { display: inline-flex; align-items: center; gap: var(--space-1); }
+.clockWords { position: relative; display: inline-flex; align-items: center; }
+.clockTime { color: inherit; font-size: inherit; }
+
+/* ── Card ────────────────────────────────────────────────────── */
+.card { padding: var(--space-3) var(--tray-card-inset); }
+.header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2-5); }
+.tile {
+  display: grid;
+  place-items: center;
+  width: var(--key-size);
+  height: var(--key-size);
+  border-radius: var(--radius-md);
+  background: var(--key-bg);
+  box-shadow: var(--key-shadow);
+  color: var(--foreground);
+}
+.tile svg { width: 16px; height: 16px; stroke-width: 1.75; }
+.heading { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.title, .description { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title { color: var(--foreground); font-size: var(--text-base); font-weight: var(--weight-medium); line-height: 18px; }
+.description { color: var(--text-muted); font-size: var(--text-sm); line-height: 16px; }
+.risk { align-self: start; margin-top: 1px; }
+.gauge { display: inline-flex; gap: 1.5px; margin-right: 1px; }
+
+/* The preview: an inset well holding exactly what will change. */
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2-5) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+.always { margin-top: var(--space-3); }
+.details { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1-5) var(--space-4); margin: 0; }
+.detail { display: contents; }
+.detail dt { color: var(--text-muted); }
+.detail dd { margin: 0; overflow: hidden; color: var(--foreground); text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Tray foot: the countdown, then the keys ─────────────────── */
+.foot { flex-wrap: wrap; row-gap: var(--space-1); padding-block: var(--space-1); }
+.hint { display: inline-flex; margin-right: calc(var(--space-1) * -1); }
+/* Working: the key swaps its content for the rays and a lit label. The rays take
+   the check's place, and the shortcut cap (mounted fresh inside the lit label)
+   glides shut, so the key narrows instead of jumping. */
+[data-loading] .collapsible { overflow: hidden; animation: capShut var(--duration-standard) var(--ease-standard) both; }
+@keyframes capShut {
+  from { max-width: 28px; opacity: 1; }
+  to { max-width: 0; margin-left: calc(var(--space-1-5) * -1); margin-right: 0; opacity: 0; }
+}
+.faceKbd { background: rgb(0 0 0 / .07); box-shadow: inset 0 0 0 .5px rgb(0 0 0 / .14); color: rgb(17 17 19 / .6); }
+/* Narrow trays drop the caps first (the shortcuts still work); with Edit they go sooner. */
+@container (max-width: 330px) { .hint { display: none; } }
+@container (max-width: 400px) { .foot[data-edit] .hint { display: none; } }
+
+/* Always allow, at the foot of the card.
+   Checkbox: a well; checked, a face cell scales in and its tick draws. */
+.check { position: relative; display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; color: var(--text-secondary); font-size: var(--text-sm); font-weight: var(--weight-regular); transition: color var(--duration-instant) var(--ease-standard); }
+.check:hover { color: var(--foreground); }
+.check[data-disabled] { opacity: .5; }
+.checkInput { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.checkBox {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-xs);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow), inset 0 0 0 1px var(--border);
+  transition: scale var(--duration-instant) var(--ease-standard);
+}
+.check:active .checkBox { scale: .92; }
+.checkInput:focus-visible + .checkBox { outline: 2px solid var(--focus-outline, rgb(236 236 239 / .55)); outline-offset: 2px; }
+.checkFace {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-xs);
+  background: var(--face-bg);
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 .5px rgb(0 0 0 / .6), 0 1px 2px rgb(0 0 0 / .4);
+  opacity: 0;
+  scale: .4;
+  transition: scale var(--duration-instant) var(--ease-collapse), opacity var(--duration-instant) var(--ease-standard);
+}
+.checkFace svg { width: 12px; height: 12px; overflow: visible; fill: none; stroke: var(--face-fg); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.checkFace path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset var(--duration-instant) ease-in; }
+.checkInput:checked + .checkBox .checkFace { opacity: 1; scale: 1; transition: scale 280ms var(--ease-pop), opacity var(--duration-instant) var(--ease-standard); }
+.checkInput:checked + .checkBox .checkFace path { stroke-dashoffset: 0; transition: stroke-dashoffset 260ms var(--ease-standard) 70ms; }
+.checkLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Resolved row ────────────────────────────────────────────── */
+.resolved { outline: none; }
+.resolvedBody { display: flex; flex: 1; align-items: center; gap: var(--space-1-5); min-width: 0; animation: rise var(--reveal-duration) var(--ease-reveal) 120ms both; }
+.outcome { flex: none; color: var(--foreground); font-weight: var(--weight-medium); }
+.outcomeTitle { min-width: 0; overflow: hidden; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.outcomeTitle::before { content: "·"; margin-right: var(--space-1-5); color: var(--text-faint); }
+.ago { flex: none; color: var(--text-muted); }
+.agoTime { font-family: var(--font-mono); letter-spacing: 0; }
+
+.drawn { flex: none; width: 14px; height: 14px; overflow: visible; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; animation: drawnIn 320ms var(--ease-standard) 160ms both; }
+.drawn[data-kind="check"] { stroke: var(--success); }
+.drawn[data-kind="cross"] { stroke: var(--text-secondary); }
+.drawn path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw var(--duration-draw) var(--ease-standard) 200ms forwards; }
+
+@keyframes rise { from { opacity: 0; translate: 0 3px; filter: blur(var(--blur-soft)); } }
+@keyframes drawnIn { from { opacity: 0; scale: .6; } }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pending, .approval[data-resolved] .pending { filter: none; }
+  .drawn path { stroke-dashoffset: 0; }
+}

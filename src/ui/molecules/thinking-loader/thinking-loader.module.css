@@ -1,0 +1,22 @@
+/* A key-material pill: rays in the live color, the label in secondary text
+   with a band of light passing over it. Done drops the sweep. */
+.loader {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  height: var(--control-height-md);
+  padding: 0 var(--space-2-5) 0 var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--key-bg);
+  box-shadow: var(--key-shadow);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 18px;
+  vertical-align: middle;
+}
+.loader[data-size="sm"] { height: var(--control-height-sm); padding: 0 var(--space-2) 0 var(--space-1-5); gap: var(--space-1); border-radius: var(--radius-sm); font-size: var(--text-xs); line-height: 16px; }
+.loader[data-variant="plain"] { height: auto; padding: 0; background: none; box-shadow: none; }
+.loader[data-done] { color: var(--text-muted); transition: color var(--duration-standard) var(--ease-standard); }
+.label { height: 18px; }
+.loader[data-size="sm"] .label { height: 16px; }

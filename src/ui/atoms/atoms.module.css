@@ -42,6 +42,20 @@
 
 .key[data-icon-only] { width: var(--h); padding: 0; }
 
+/* Loading: rays take the leading icon's place and a band of light sweeps the label. */
+.key[data-loading] { cursor: progress; }
+.key .keySpin { color: currentColor; animation: keyIconIn 420ms var(--ease-standard) both; }
+.keyLabel { display: inline-flex; align-items: center; gap: inherit; --sheen: rgb(255 255 255 / .95);
+  background: linear-gradient(90deg, currentColor 0% 38%, var(--sheen) 50%, currentColor 62% 100%) 0 0 / 250% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: keySweep var(--duration-sweep) linear infinite; }
+.keyLabel > svg:first-child { display: none; }
+.key[data-variant="primary"] .keyLabel { --sheen: rgb(0 0 0 / .3); }
+.key[data-variant="primary"] .keySpin { color: var(--face-fg); }
+@keyframes keySweep { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+@keyframes keyIconIn { from { opacity: 0; scale: .7; filter: blur(var(--blur-soft)); } }
+@media (prefers-reduced-motion: reduce) { .keyLabel { animation: none; } }
+
 /* ── Kbd ─────────────────────────────────────────────────────── */
 .kbd {
   display: inline-grid;

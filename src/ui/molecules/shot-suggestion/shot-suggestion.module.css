@@ -1,0 +1,95 @@
+/* The card holds the sentence and the reason; the tray's footer holds the
+   signal and the actions. Accepted, the card goes quiet and the footer
+   swaps to the confirmation. */
+
+/* ── Head: a button that folds the reason ────────────────────── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-2-5) var(--space-2) var(--tray-card-inset);
+  border: 0;
+  border-radius: var(--radius-tray-card);
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.head:hover:not(:disabled) { background: var(--hover); }
+.head:disabled { color: var(--text-secondary); transition: color var(--duration-standard) var(--ease-standard); }
+.headline { display: flex; flex: 1; flex-wrap: wrap; align-items: baseline; column-gap: .3em; min-width: 0; line-height: 20px; }
+.name { height: 20px; font-weight: var(--weight-strong); }
+.context { min-width: 0; color: inherit; }
+.alt { display: inline-flex; flex: none; }
+.chevron { flex: none; width: 14px; height: 14px; stroke-width: 2; color: var(--text-muted); transition: rotate 280ms var(--ease-standard); }
+.head[aria-expanded="false"] .chevron { rotate: -90deg; }
+
+.reason {
+  padding: 0 var(--space-3) var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+.reason p { margin: 0; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.root .foot { display: flex; flex: 1; align-items: center; gap: var(--space-1); min-width: 0; }
+.confidence { display: inline-flex; align-items: center; gap: var(--space-1-5); color: var(--text-muted); }
+.cells { display: inline-flex; gap: 2px; }
+.cells > span { transition: background-color 200ms var(--ease-standard); }
+.cells > span:nth-child(2) { transition-delay: 40ms; }
+.cells > span:nth-child(3) { transition-delay: 80ms; }
+.word { height: 16px; color: var(--text-secondary); }
+.using { display: inline-flex; align-items: center; gap: var(--space-1-5); color: var(--foreground); }
+.check { color: var(--success); }
+
+/* ── Other options ───────────────────────────────────────────── */
+.menuWrap { position: relative; display: inline-flex; }
+.menuChevron { width: 13px !important; height: 13px !important; margin-right: -2px; transition: rotate 220ms var(--ease-standard); }
+.menuChevron[data-open] { rotate: 180deg; }
+.menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-1-5));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 232px;
+  padding: var(--dock-pad);
+  border-radius: var(--radius-dock);
+  background: var(--dock-bg);
+  box-shadow: var(--dock-shadow);
+  transform-origin: 100% 100%;
+}
+.option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 30px;
+  padding: 0 var(--space-2-5) 0 var(--space-1-5);
+  border: 0;
+  border-radius: var(--radius-key);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  transition: color var(--duration-instant), scale var(--duration-instant) var(--ease-standard);
+}
+.option:active { scale: .98; }
+.option > :not(.optionHi) { position: relative; }
+.option[aria-checked="true"], .option:hover, .option:focus-visible { color: var(--foreground); }
+.menu .option:focus-visible { outline: none !important; }
+.optionHi { position: absolute; inset: 0; border-radius: inherit; background: var(--pressed); }
+.optionCheck { display: grid; flex: none; place-items: center; width: 14px; height: 14px; }
+.optionCheck svg { width: 13px; height: 13px; stroke-width: 2.25; }
+.optionName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron, .menuChevron, .cells > span { transition: none; }
+}

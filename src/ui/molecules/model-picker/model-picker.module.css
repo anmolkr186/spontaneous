@@ -1,0 +1,102 @@
+/* ── Trigger ─────────────────────────────────────────────────────
+   A tertiary key: the model's short name, a bulb that unfolds
+   sideways while thinking is on, and a chevron.                  */
+button.trigger[data-size] { gap: 0; padding: 0 var(--space-1-5) 0 var(--space-2); }
+.triggerName { height: 16px; line-height: 16px; }
+.bulb { display: grid; grid-template-columns: 0fr; opacity: 0; transition: grid-template-columns var(--duration-fold) var(--ease-glide), opacity 200ms ease; }
+.bulb[data-on] { grid-template-columns: 1fr; opacity: 1; transition: grid-template-columns var(--duration-fold) var(--ease-glide), opacity 280ms ease 80ms; }
+.bulbClip { display: flex; align-items: center; min-width: 0; overflow: hidden; padding-left: var(--space-1); }
+.trigger .bulbClip svg { width: 12px; height: 12px; stroke-width: 2; color: var(--foreground); }
+.trigger .triggerChevron { width: 12px; height: 12px; margin-left: var(--space-1); stroke-width: 2; color: var(--text-muted); transition: rotate var(--duration-standard) var(--ease-standard); }
+.trigger[data-state="open"] .triggerChevron { rotate: 180deg; }
+
+/* ── Menu ────────────────────────────────────────────────────────
+   A dock slab. It grows out of the trigger's corner on the reveal
+   curve and collapses faster than it opened.                      */
+.menu {
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dock-pad);
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: var(--dock-pad);
+  border-radius: var(--radius-dock);
+  background: var(--dock-bg);
+  box-shadow: var(--dock-shadow);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.menu[data-state="open"] { animation: menuIn var(--reveal-duration) var(--ease-reveal); }
+.menu[data-state="closed"] { animation: menuOut var(--collapse-duration) var(--ease-collapse) forwards; }
+@keyframes menuIn { from { opacity: 0; scale: .96; filter: blur(var(--blur-soft)); } }
+@keyframes menuOut { to { opacity: 0; scale: .96; filter: blur(var(--blur-soft)); } }
+
+/* Model column, three meter columns, the check. Shared by the legend and every row. */
+.legend, .option { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 34px) 14px; align-items: center; column-gap: var(--space-1-5); }
+.legend { height: 22px; padding: 0 var(--space-2-5); color: var(--text-faint); font-size: var(--text-2xs); font-weight: var(--weight-medium); }
+
+.list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; outline: none; }
+.list:focus-visible { outline: none; }
+.option {
+  position: relative;
+  min-height: 42px;
+  padding: var(--space-1-5) var(--space-2-5);
+  border-radius: var(--radius-key);
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.option > :not(.fill) { position: relative; }
+/* The highlight is one element that glides between rows. */
+.fill { position: absolute; inset: 0; border-radius: inherit; background: var(--pressed); box-shadow: inset 0 1px 0 rgb(255 255 255 / .03); }
+.list:focus-visible .fill { box-shadow: inset 0 0 0 1px var(--border-strong); }
+/* Pointing at a model steps the others back. */
+.list[data-pointing] .option:not([data-active]) { opacity: .5; }
+
+.optText { display: flex; flex-direction: column; min-width: 0; }
+.optName { overflow: hidden; color: var(--foreground); font-weight: var(--weight-medium); line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.optDesc { overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.varies { grid-column: 2 / 5; color: var(--text-muted); font-size: var(--text-xs); }
+.optCheck { display: grid; place-items: center; color: var(--foreground); }
+.optCheck svg { width: 13px; height: 13px; stroke-width: 2.25; }
+
+/* Meters: five skewed cells. Values sit dim; the pointed row fills cell by cell. */
+.segments { display: inline-flex; align-items: center; gap: 2px; }
+.segments .seg { background: var(--g-650); transition: background-color var(--duration-fast) ease; }
+.segments .seg[data-fill] { background: var(--g-500); }
+.option[data-active] .seg[data-fill] {
+  background: var(--g-100);
+  transition: background-color 200ms ease;
+  transition-delay: calc(var(--n) * 45ms);
+}
+.option[data-active] .segments + .segments .seg[data-fill] { transition-delay: calc(60ms + var(--n) * 45ms); }
+.option[data-active] .segments + .segments + .segments .seg[data-fill] { transition-delay: calc(120ms + var(--n) * 45ms); }
+
+/* ── Settings ────────────────────────────────────────────────── */
+.settings { display: flex; flex-direction: column; padding: var(--space-1) 0; box-shadow: inset 0 1px 0 var(--border-subtle); }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 40px; padding: var(--space-1) var(--space-2-5); }
+.settingText { display: flex; flex-direction: column; min-width: 0; }
+.settingName { color: var(--foreground); font-weight: var(--weight-medium); }
+.settingHint { color: var(--text-muted); font-size: var(--text-xs); }
+
+/* ── Tray: what the highlighted model costs ──────────────────── */
+.tray {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tray-row);
+  padding: 0 var(--space-2-5);
+  border-radius: var(--radius-key);
+  background: var(--tray-bg);
+  box-shadow: var(--tray-shadow);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.trayItem { display: inline-flex; align-items: center; gap: var(--space-1-5); white-space: nowrap; }
+.trayLabel { color: var(--text-muted); }
+.trayValue { color: var(--foreground); font-weight: var(--weight-medium); }
+
+@media (prefers-reduced-motion: reduce) {
+  .option[data-active] .seg[data-fill] { transition-delay: 0ms !important; }
+}

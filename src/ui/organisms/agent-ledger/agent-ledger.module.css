@@ -1,0 +1,79 @@
+/* AgentLedger: a list of changes on one card in the tray. Every row is the
+   same height; the right-hand slot swaps between the time, Undo, Redo and the
+   flags, so pointing at a row never moves anything else. */
+
+.ledger { --focus-outline-offset: 1px; --row: 48px; }
+.byline { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; color: var(--text-secondary); }
+.byline::before { content: "·"; margin-right: var(--space-0-5); color: var(--text-faint); }
+
+.card { padding: var(--space-1); }
+.list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.item { overflow: hidden; }
+
+/* ── Row ─────────────────────────────────────────────────────── */
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: var(--space-2-5);
+  height: var(--row);
+  padding: 0 var(--space-1) 0 var(--space-1-5);
+  border-radius: calc(var(--radius-tray-card) - var(--space-1));
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.row[data-lit="self"] { background: var(--pressed); }
+.row[data-lit="also"] { background: var(--hover); }
+
+.icon { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-sm); background: var(--key-bg); box-shadow: var(--key-shadow); color: var(--text-secondary); transition: opacity var(--duration-standard) var(--ease-standard); }
+.icon svg { width: 13px; height: 13px; stroke-width: 1.9; }
+
+.main { position: relative; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.what, .change { display: flex; align-items: baseline; gap: var(--space-1-5); min-width: 0; overflow: hidden; white-space: nowrap; }
+.action { flex: none; color: var(--foreground); font-size: var(--text-base); font-weight: var(--weight-medium); line-height: 18px; }
+.target { min-width: 0; overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); text-overflow: ellipsis; }
+.position { flex: none; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; }
+.change { align-items: center; font-size: var(--text-sm); line-height: 16px; }
+.before { flex: none; color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--g-500); }
+.arrow { flex: none; width: 11px; height: 11px; color: var(--text-faint); stroke-width: 2; }
+.after { min-width: 0; overflow: hidden; color: var(--text-secondary); text-overflow: ellipsis; }
+
+.action, .target, .after { transition: color var(--duration-standard) var(--ease-standard); }
+
+/* Undo draws a line across the row, a beat later for each step down the chain;
+   Redo takes it back toward the right, quicker. */
+.strike {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: calc(var(--space-1) * -1);
+  height: 1px;
+  border-radius: 1px;
+  background: var(--text-muted);
+  scale: 0 1;
+  transform-origin: right center;
+  transition: scale var(--duration-standard) var(--ease-collapse);
+}
+.row[data-undone] .strike { scale: 1 1; transform-origin: left center; transition: scale var(--duration-draw) var(--ease-standard) calc(var(--k, 0) * var(--stagger)); }
+.row[data-undone] :is(.action, .target, .after) { color: var(--text-muted); transition-delay: calc(var(--k, 0) * var(--stagger)); }
+.row[data-undone] .icon { opacity: .45; transition-delay: calc(var(--k, 0) * var(--stagger)); }
+
+/* ── The slot: time, Undo, Redo and the flags share it ───────── */
+.slot { position: relative; display: flex; justify-content: flex-end; align-items: center; }
+.swap { justify-content: flex-end; }
+.pair { display: grid; justify-items: end; align-items: center; }
+.pair > * { grid-area: 1 / 1; transition: opacity var(--duration-fast) var(--ease-standard), filter var(--duration-fast) var(--ease-standard), translate var(--duration-standard) var(--ease-standard); }
+.pair > .key { opacity: 0; translate: 0 3px; filter: blur(var(--blur-soft)); }
+.row:is(:hover, :focus-within, [data-lit="self"]) .pair > .key { opacity: 1; translate: 0 0; filter: none; }
+.row:is(:hover, :focus-within, [data-lit="self"]) .pair > .pairTime { opacity: 0; translate: 0 -2px; filter: blur(var(--blur-soft)); }
+@media (hover: none) {
+  .pair > .key { opacity: 1; translate: 0 0; filter: none; }
+  .pair > .pairTime { opacity: 0; }
+}
+.key svg { width: 13px; height: 13px; }
+
+.ago { color: var(--text-muted); font-size: var(--text-xs); white-space: nowrap; }
+.agoTime { font-family: var(--font-mono); letter-spacing: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pair > * { filter: none !important; translate: none !important; }
+}

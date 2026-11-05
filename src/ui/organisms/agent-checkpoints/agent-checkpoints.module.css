@@ -1,0 +1,112 @@
+/* ── Agent checkpoints ─────────────────────────────────────────
+   Fixed-height rows over one SVG of lines. Nodes are skewed cells on
+   their lane; the way to head is light, everything off it is muted.  */
+.heading { flex: none; }
+.task { min-width: 0; overflow: hidden; color: var(--text-secondary); text-overflow: ellipsis; }
+.task::before { content: "·"; margin-right: var(--space-1-5); color: var(--text-faint); }
+
+.scroller {
+  position: relative;
+  max-height: calc(14 * var(--row) + 2 * var(--space-1));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / .08) transparent;
+}
+.lines { position: absolute; top: var(--space-1); left: var(--space-1); overflow: visible; pointer-events: none; }
+.list { position: relative; margin: 0; padding: var(--space-1); list-style: none; }
+
+/* ── Lines ───────────────────────────────────────────────────── */
+.edge {
+  fill: none;
+  stroke: var(--g-600);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  transition: stroke var(--duration-considered) var(--ease-standard);
+  animation: draw 520ms var(--ease-standard) backwards;
+  animation-delay: var(--d);
+}
+.edge[data-on-path] { stroke: var(--g-300); }
+@keyframes draw { from { stroke-dashoffset: 1; } }
+
+/* ── Row ─────────────────────────────────────────────────────── */
+.row {
+  --focus-outline-offset: -2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--row);
+  padding: 0 var(--space-2) 0 var(--gutter);
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+  animation: rowIn var(--duration-considered) var(--ease-standard) backwards;
+  animation-delay: var(--d);
+}
+.row[data-rewind]:hover { background: var(--hover); }
+@keyframes rowIn { from { opacity: 0; translate: 0 6px; filter: blur(var(--blur-soft)); } }
+
+/* The node: a cell on its lane. It pops in; a new one gets one short glint. */
+.node {
+  position: absolute;
+  top: calc(50% - 4px);
+  left: calc(var(--x) - 4px);
+  transition: background-color var(--duration-considered) var(--ease-standard), box-shadow var(--duration-considered) var(--ease-standard);
+  animation: nodePop 380ms var(--ease-pop) backwards;
+  animation-delay: calc(var(--d) + 120ms);
+}
+.row[data-current] .node { box-shadow: 0 0 0 2.5px rgb(255 255 255 / .14); }
+.row[data-new] .node::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / .95) 50%, transparent 70%) 0 0 / 300% 100%;
+  opacity: 0;
+  animation: glint 560ms ease-out 300ms;
+}
+@keyframes nodePop { from { opacity: 0; scale: 0; } }
+@keyframes glint { from { background-position: 100% 0; opacity: 1; } to { background-position: 0% 0; opacity: 0; } }
+
+.title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--duration-considered) var(--ease-standard);
+}
+.row[data-current] .title { font-weight: var(--weight-medium); }
+.row[data-behind] .title, .row[data-status="stopped"] .title { color: var(--text-muted); }
+
+/* Edits and time share one slot with Rewind, so rows never change size. */
+.slot { display: grid; flex: none; align-items: center; justify-items: end; }
+.slot > * { grid-area: 1 / 1; }
+.info { display: inline-flex; align-items: center; gap: var(--space-2); transition: opacity var(--duration-fast) var(--ease-standard); }
+.edits { color: var(--text-muted); font-size: var(--text-xs); }
+.time { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; }
+.rewind { opacity: 0; pointer-events: none; transition: opacity var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); }
+.row[data-rewind]:is(:hover, :focus) .rewind { opacity: 1; pointer-events: auto; }
+.row[data-rewind]:is(:hover, :focus) .info { opacity: 0; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.foot { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-secondary); white-space: nowrap; }
+.attempts { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-muted); }
+.attempts::before { content: "·"; margin: 0 var(--space-0-5); color: var(--text-faint); }
+
+@container (max-width: 340px) {
+  .edits, .task { display: none; }
+}
+
+@media (hover: none) {
+  .row[data-rewind] .rewind { opacity: 1; pointer-events: auto; }
+  .row[data-rewind] .info { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row, .node, .edge, .row[data-new] .node::after { animation: none; }
+}

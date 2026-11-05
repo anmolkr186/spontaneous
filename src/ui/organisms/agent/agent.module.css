@@ -18,6 +18,9 @@
 .byline > span + span::before { content: "·"; margin-right: var(--space-1-5); color: var(--text-faint); }
 .stopped { color: var(--text-muted); }
 .assistantBody { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+/* Hanging tray: an agent card steps out into the gutter by its own inset, so its
+   icons share the mark's edge and its words share the name's edge. */
+.assistantBody :global([data-tray]):not(:global([data-tray]) :global([data-tray])) { width: calc(100% + var(--tray-inset)); max-width: calc(400px + var(--tray-inset)); margin-left: calc(var(--tray-inset) * -1); }
 .placeholder { font-size: var(--text-sm); }
 .text { margin: 0; color: var(--foreground); font-size: var(--text-base); line-height: 1.55; white-space: pre-wrap; user-select: text; }
 .cursorBlink::after { content: ""; display: inline-block; width: 2px; height: 13px; margin-left: 2px; translate: 0 2px; border-radius: 1px; background: var(--text-secondary); animation: blink 1s steps(2) infinite; }

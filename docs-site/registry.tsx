@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Mic, Monitor, Redo2, Scissors, Undo2 } from "lucide-react";
+import { Mic, Monitor, RectangleHorizontal, RectangleVertical, Redo2, Scissors, Square, Undo2 } from "lucide-react";
 import { Cell, IconKey, Kbd, Key, Label, Mark, Meter, Tag, Timecode } from "@/ui/atoms";
 import { Field, Group, Hint, NoteCard, SourceKey, SwatchPicker, Switcher, ToggleKey } from "@/ui/molecules";
 import { ScreenArt, ShotCard } from "@/ui/organisms/shot";
@@ -27,13 +27,28 @@ import stageSrc from "@/ui/organisms/stage/index.tsx?raw";
 import timelineSrc from "@/ui/organisms/timeline/index.tsx?raw";
 import agentSrc from "@/ui/organisms/agent/index.tsx?raw";
 
+import type { Details } from "./details";
+import { DETAILS } from "./details";
+import { say, title } from "./naming";
+import { useScript } from "./demo";
+
 export type Layer = "Atoms" | "Molecules" | "Organisms";
+/** What a component is for. The docs sidebar groups by this; the layer is a tag on the page. */
+export type Category = "Chat" | "Agent" | "Editing" | "Inputs" | "Feedback" | "Primitives";
 export interface PropDoc { name: string; type: string; description: string }
 
 export interface DocEntry {
   id: string;
+  /** The component's name. Written as in code ("AgentPlan"); pages show it in plain words ("Agent plan"). */
   name: string;
+  /** The identifier to import, filled in from `name` when left out. */
+  code?: string;
   layer: Layer;
+  category: Category;
+  /** Sort order inside its category; lower comes first. Core entries keep file order. */
+  order?: number;
+  /** Shows a "New" tag in the sidebar. */
+  isNew?: boolean;
   description: string;
   demo: () => ReactNode;
   flush?: boolean;
@@ -44,6 +59,14 @@ export interface DocEntry {
   composedOf?: string[];
   whenToUse: string[];
   whenNot?: string[];
+  /** Each key and what it does. */
+  keyboard?: [keys: string, does: string][];
+  /** What assistive tech gets. */
+  a11y?: string[];
+  /** How it moves, in plain words, one line per moment. Ends with the reduced-motion branch. */
+  motion?: string[];
+  /** Variants, states and interactions, kept with the entry. Core entries use details.tsx. */
+  details?: Details;
 }
 
 /* ───────────────────────── Demo helpers ───────────────────────── */
@@ -68,13 +91,32 @@ const demoThread: AgentMessage[] = [
   },
 ];
 
+/** Plays a short session: switch to Studio, two notes arrive, open them, try aspect ratios, go back. */
 function SwitcherDemo() {
   const [mode, setMode] = useState<"lite" | "studio">("lite");
-  const [tab, setTab] = useState<"agent" | "notes">("notes");
+  const [side, setSide] = useState<"agent" | "notes">("agent");
+  const [open, setOpen] = useState(0);
+  const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const root = useScript([
+    { at: 900, run: () => setMode("studio") },
+    { at: 2000, run: () => setOpen(2) },
+    { at: 3000, run: () => setSide("notes") },
+    { at: 3800, run: () => setOpen(3) },
+    { at: 4800, run: () => setAspect("9:16") },
+    { at: 5800, run: () => setAspect("1:1") },
+    { at: 6900, run: () => setSide("agent") },
+    { at: 7900, run: () => setMode("lite") },
+  ]);
   return (
-    <div style={{ display: "grid", gap: 20, justifyItems: "center" }}>
-      <Switcher label="Mode" value={mode} onChange={setMode} options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} />
-      <Switcher label="Panel" value={tab} onChange={setTab} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: 2 }]} />
+    <div ref={root} style={{ display: "grid", gap: 18, justifyItems: "center" }}>
+      <Switcher label="Editor mode" value={mode} onChange={setMode} options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} />
+      <Switcher label="Side panel" value={side} onChange={setSide} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: open }]} />
+      <Switcher label="Aspect ratio" size="lg" value={aspect} onChange={setAspect} options={[
+        { value: "16:9", label: "16:9", icon: <RectangleHorizontal /> },
+        { value: "9:16", label: "9:16", icon: <RectangleVertical /> },
+        { value: "1:1", label: "1:1", icon: <Square /> },
+      ]} />
+      <span style={{ color: "var(--text-muted)", fontSize: 12 }}>Press the key and drag it across the options.</span>
     </div>
   );
 }
@@ -190,7 +232,7 @@ function TooltipDemo() {
 
 /* ───────────────────────── Registry ───────────────────────── */
 
-export const ENTRIES: DocEntry[] = [
+const CORE: Omit<DocEntry, "category">[] = [
   /* Atoms */
   {
     id: "mark", name: "Mark", layer: "Atoms",
@@ -224,9 +266,34 @@ export const ENTRIES: DocEntry[] = [
       { name: "variant", type: "\"primary\" | \"secondary\" | \"tertiary\"", description: "Place in the hierarchy. Default secondary." },
       { name: "size", type: "\"sm\" | \"md\" | \"lg\"", description: "24, 28 or 34px tall." },
       { name: "pressed", type: "boolean", description: "Toggle state. Sets aria-pressed and seats the key." },
+      { name: "loading", type: "boolean", description: "Working on it: rays replace the leading icon, a band of light sweeps the label, clicks are ignored. Stays focusable and sets aria-busy." },
+      { name: "...props", type: "button attributes", description: "Everything a native button takes, including ref, disabled and onClick. type defaults to \"button\"." },
     ],
-    whenToUse: ["Every button in the app is a Key or a component built from one."],
-    whenNot: ["More than one primary per surface. If two actions compete, one of them is not primary."],
+    whenToUse: [
+      "Every button in the app is a Key or a component built from one.",
+      "Async actions that take a moment (Export, Apply, Render): set loading so the label stays readable while it works.",
+    ],
+    whenNot: [
+      "More than one primary per surface. If two actions compete, one of them is not primary.",
+      "Switching between views or modes: use a Switcher, which shows the current state.",
+      "Icon-only actions: use IconKey, which requires a label and shows it as a tooltip.",
+    ],
+    keyboard: [
+      ["↵ Space", "Activates the key, same as a click. Ignored while loading."],
+      ["Tab", "Moves focus to the key; the ring shows for keyboard focus only."],
+    ],
+    a11y: [
+      "A native button, so focus, keyboard and form behavior work as expected. type defaults to \"button\" so a key never submits by accident.",
+      "pressed sets aria-pressed, so toggles are announced as on or off.",
+      "While loading it stays focusable and sets aria-busy instead of becoming disabled, so focus isn't lost while it works.",
+      "Disabled keys drop to 40% and take no pointer; say why with a Tooltip hint where it isn't obvious.",
+    ],
+    motion: [
+      "Hover: the gradient lightens over 120ms; tertiary gains a fill.",
+      "Press: the key seats 0.5px and scales to .98 with an inset shadow, 120ms on --ease-standard.",
+      "Loading: rays take the leading icon's place, rising out of a 2px blur over 420ms; a band of light sweeps the label every 1.6s.",
+      "Reduced motion: no seat or scale travel, the rays stand still and the sweep stops.",
+    ],
   },
   {
     id: "icon-key", name: "IconKey", layer: "Atoms",
@@ -324,17 +391,73 @@ export const ENTRIES: DocEntry[] = [
   },
   {
     id: "switcher", name: "Switcher", layer: "Molecules",
-    description: "Mutually exclusive options in a well. The chosen option rises as a key and slides between positions on a spring. Used for Lite/Studio, the side panel, inspector tabs and aspect ratios.",
+    description: "Two to five options in a well; the chosen one rises as a key. The key glides to a new pick with its leading edge running ahead, gives a little when pressed, and can be dragged across the options. Used for Lite/Studio, the side panel, inspector tabs and aspect ratios.",
     demo: () => <SwitcherDemo />,
-    usage: `<Switcher label="Editor mode" value={mode} onChange={setMode}\n  options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} />`,
+    usage: `<Switcher label="Editor mode" value={mode} onChange={setMode}
+  options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} />
+
+// Side panel tabs; the count is open notes, in ink
+<Switcher kind="tabs" label="Side panel" value={side} onChange={setSide} options={[
+  { value: "agent", label: "Agent", controls: "panel-agent" },
+  { value: "notes", label: "Notes", count: openNotes, controls: "panel-notes" },
+]} />
+
+// Aspect ratio with icons, filling the inspector column
+<Switcher full label="Aspect ratio" value={aspect} onChange={setAspect} options={[
+  { value: "16:9", label: "16:9", icon: <RectangleHorizontal /> },
+  { value: "9:16", label: "9:16", icon: <RectangleVertical /> },
+  { value: "1:1", label: "1:1", icon: <Square /> },
+]} />`,
     source: moleculesSrc, sourcePath: "src/ui/molecules/index.tsx",
     props: [
-      { name: "options", type: "{ value, label, count? }[]", description: "2–5 options. count shows open items in ink." },
-      { name: "full", type: "boolean", description: "Stretch to the container width." },
+      { name: "options", type: "SwitcherOption[]", description: "2–5 of { value, label?, icon?, count?, badge?, disabled?, ariaLabel?, controls? }. Give icon-only options an ariaLabel." },
+      { name: "options[].count", type: "number", description: "Open items, in ink. Zero shows nothing; a new count blurs in and changed digits roll." },
+      { name: "options[].badge", type: "string", description: "A short neutral Tag after the label (\"Beta\"). Words, never a hue." },
+      { name: "options[].disabled", type: "boolean", description: "Can't be picked; arrow keys skip it and the key never lands on it." },
+      { name: "options[].controls", type: "string", description: "With kind=\"tabs\": the id of the panel this tab shows (aria-controls)." },
+      { name: "value", type: "T", description: "Controlled value." },
+      { name: "defaultValue", type: "T", description: "Starting value when uncontrolled. Defaults to the first enabled option." },
+      { name: "onChange", type: "(value: T) => void", description: "Called on click, on arrow keys, and for each option the key is dragged across." },
+      { name: "label", type: "string", description: "Required. Names the group for assistive tech (\"Editor mode\")." },
+      { name: "size", type: "\"sm\" | \"md\" | \"lg\"", description: "24, 30 or 34px tall overall. Default md." },
+      { name: "full", type: "boolean", description: "Stretch to the container with equal options." },
+      { name: "kind", type: "\"radio\" | \"tabs\"", description: "A radiogroup for modes and enums (default), or a tablist that switches panels." },
+      { name: "disabled", type: "boolean", description: "Turns the whole switcher off." },
     ],
-    composedOf: ["Well material", "Key material"],
-    whenToUse: ["Switching views or a small enum."],
-    whenNot: ["More than five options. Use a list."],
+    composedOf: ["Well material", "Key material", "RollNumber", "Tag"],
+    whenToUse: [
+      "Switching between views of the same thing, where every option stays visible: Lite/Studio, Agent/Notes, inspector tabs.",
+      "A small enum that applies right away: aspect ratio, shot set, backdrop set.",
+      "Use kind=\"tabs\" when each option shows its own panel, and pass controls with the panel's id.",
+    ],
+    whenNot: [
+      "More than five options or long labels. Use a list or a menu.",
+      "Turning one thing on or off. Use Switch, or ToggleKey inside a dock.",
+      "A choice confirmed later with a Save or Apply key. Plain radios read clearer there.",
+      "An action. Use a Key: a Switcher shows state, it doesn't do things.",
+    ],
+    keyboard: [
+      ["Tab", "Focuses the chosen option. The whole switcher is one tab stop."],
+      ["← →", "Picks the previous or next option, wrapping around and skipping disabled ones."],
+      ["↑ ↓", "The same, as a radiogroup. As tabs they are left to the page."],
+      ["Home", "Picks the first option."],
+      ["End", "Picks the last option."],
+      ["↵ Space", "Picks the focused option."],
+    ],
+    a11y: [
+      "A radiogroup of radios with aria-checked, or with kind=\"tabs\" a tablist of tabs with aria-selected and aria-controls.",
+      "Roving tabindex: only the chosen option is in the tab order. Disabled options are skipped by the arrow keys and drags.",
+      "Each option is named by its label (or ariaLabel), then its count and badge: \"Notes, 2\". The strong copy of the label and the key are hidden.",
+      "Focus follows the pick, so arrow keys never leave focus on an unchosen option. The ring shows for keyboard focus only.",
+    ],
+    motion: [
+      "A new pick: the key glides there on --ease-standard. The edge facing the target leads (270ms) and the far edge trails (400ms), so the key stretches a little and settles, without bounce.",
+      "Labels crossfade from medium to strong weight over 160ms while a hidden strong copy holds the width, so neighbours never shift.",
+      "Press: the key gives a little, to .97 over 120ms.",
+      "Drag: the key rides the pointer and stays inside the well, picks each option it crosses, its width settles to the option under it, and on release it snaps into place on a no-bounce spring.",
+      "A label or count that changes glides the option, and the well, to the new width over 460ms; the key follows every frame. A new count rises out of a 2px blur; changed digits roll.",
+      "Reduced motion: the key moves instantly, labels and widths switch at once, counts appear without blur.",
+    ],
   },
   {
     id: "group", name: "Group and Field", layer: "Molecules",
@@ -482,5 +605,56 @@ export const ENTRIES: DocEntry[] = [
     whenToUse: ["When the agent would otherwise guess at taste or direction."],
   },
 ];
+
+const CATEGORY_OF: Record<string, Category> = {
+  mark: "Primitives", text: "Primitives", tag: "Primitives", cell: "Primitives",
+  key: "Inputs", "icon-key": "Inputs", tooltip: "Inputs", switcher: "Inputs", group: "Inputs", "dock-keys": "Inputs",
+  meter: "Feedback",
+  "note-card": "Editing", swatch: "Editing", "annotation-dock": "Editing", "recorder-dock": "Editing", stage: "Editing", timeline: "Editing", "shot-library": "Editing",
+  "agent-thread": "Chat", ask: "Chat",
+};
+
+/* Every file in docs-site/components exports one `entry`; adding a file adds a page. */
+const added = Object.values(import.meta.glob<{ entry?: DocEntry; entries?: DocEntry[] }>("./components/*.tsx", { eager: true }))
+  .flatMap((m) => (m.entries ?? (m.entry ? [m.entry] : [])));
+
+export const CATEGORIES: Category[] = ["Chat", "Agent", "Editing", "Inputs", "Feedback", "Primitives"];
+
+/** "SourceKey and ToggleKey" → "SourceKey, ToggleKey"; names that aren't identifiers ("Shot library") give none. */
+function codeOf(name: string) {
+  const parts = name.split(/,\s*|\s+and\s+/);
+  return parts.every((p) => /^[A-Z][A-Za-z0-9]*$/.test(p)) ? parts.join(", ") : undefined;
+}
+
+/** Every name and sentence a page shows, in plain words; code stays as it is. */
+function forDisplay(e: DocEntry): DocEntry {
+  const d = e.details ?? DETAILS[e.id];
+  return {
+    ...e,
+    code: e.code ?? codeOf(e.name),
+    name: title(e.name),
+    description: say(e.description),
+    props: e.props.map((p) => ({ ...p, description: say(p.description) })),
+    composedOf: e.composedOf?.map(title),
+    whenToUse: e.whenToUse.map(say),
+    whenNot: e.whenNot?.map(say),
+    keyboard: e.keyboard?.map(([k, v]) => [k, say(v)]),
+    a11y: e.a11y?.map(say),
+    motion: e.motion?.map(say),
+    details: d && {
+      ...d,
+      limit: say(d.limit),
+      variants: d.variants.map((v) => ({ name: say(v.name), when: say(v.when) })),
+      states: d.states?.map((st) => ({ ...st, name: say(st.name), note: say(st.note) })),
+      interactions: d.interactions?.map((i) => ({ input: say(i.input), response: say(i.response) })),
+    },
+  };
+}
+
+export const ENTRIES: DocEntry[] = [
+  ...CORE.map((e, i) => ({ ...e, category: CATEGORY_OF[e.id] ?? "Primitives", order: e.order ?? 100 + i })),
+  ...added,
+].sort((a, b) => CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) || (a.order ?? 100) - (b.order ?? 100))
+  .map(forDisplay);
 
 export const LAYERS: Layer[] = ["Atoms", "Molecules", "Organisms"];
