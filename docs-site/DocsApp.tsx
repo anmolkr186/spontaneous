@@ -53,7 +53,6 @@ export function DocsApp() {
             <Search />
             <input placeholder="Search components" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search components" />
           </label>
-          <Key size="md" onClick={() => { location.href = "/"; }}>Open the editor</Key>
         </div>
       </header>
       <aside className={styles.sidebar}>
