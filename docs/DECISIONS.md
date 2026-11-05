@@ -9,9 +9,6 @@ Each entry: **what**, **why**, **where it lives**, and the date. Dates are when 
 - **Stacked decisions: newest or oldest gets the primary?** (2026-11-06)
   - When two agent asks are on the panel (e.g. two Approval cards), the election gives the primary to the newest (`src/ui/cta/elect.ts`, rule 3). That matches "the card that just arrived is in view". An inbox-style flow might prefer oldest first (answer in order).
   - Revisit when the real agent can raise more than one ask per turn.
-- **Destructive primary is red** (2026-11-06)
-  - A destructive CTA that holds the primary takes a red face (`src/ui/cta/cta-key.module.css`). This is the one place a primary takes a hue. Red already means recording and destructive, so it fits the signal rules, but it's a new use of the face.
-  - Confirm, or fall back to the light face with a red label.
 - **Play is no longer a primary** (2026-11-06)
   - The round Play key in Lite moved from the light face to key material, because transport isn't a call to action and it competed with the surface's primary (`src/editor/Editor.tsx`, ScrubBar).
   - Confirm by eye in the app.
@@ -72,6 +69,10 @@ Each entry: **what**, **why**, **where it lives**, and the date. Dates are when 
   - A tie goes to the candidate that most recently appeared or became enabled.
   - Export (finish) waits while any decide or run is pending anywhere. The editor also holds it while a run is going.
   - Code: `src/ui/cta`, Foundations › Actions.
+- **A destructive primary takes a red face** (2026-11-06)
+  - When a destructive action holds the primary ("Delete 3 takes", "Overwrite export"), the light face becomes red with white text (`src/ui/cta/cta-key.module.css`).
+  - It's the only primary that takes a hue. Red already means recording and destructive, so it stays within the signals.
+  - Chosen over a light face with a red label, and over a key with a red label.
 
 ### Agent
 - **The agent is the user's Claude Code CLI over stream-json, acting only through our MCP tools** (2026-10-30)
