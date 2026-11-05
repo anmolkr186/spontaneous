@@ -23,6 +23,17 @@ nvm use
 | `npm version prerelease --preid beta` | Shipping to testers | Same, with a version like `0.1.1-beta.0` | Draft marked as a prerelease |
 | `gh release edit v0.2.0 --draft=false` | You've checked the draft | Publishes that release. Use the real version number | The GitHub release page, for anyone who can see the repo |
 
+## Ask Claude instead
+
+In a Claude Code session in this folder, you can ask in plain words. Claude follows the matching skill in `.claude/skills`, which runs the checks and reports where the result went.
+
+| Say | What happens |
+|---|---|
+| "Run the app" | Starts `npm run tauri:dev` and checks the build cache is outside the repo |
+| "Build the app" or "Make a DMG" | Runs `npm run package`, checks the DMG and its signature, then gives you the path |
+| "Build and install it" | Builds, then replaces `/Applications/Spontaneous.app`. Claude asks before quitting the app if it's running |
+| "Cut a release" | Picks the version, tags it and stops at the GitHub draft until you say yes |
+
 ## A typical day
 
 1. Open `~/code/sptn` and start the app:
