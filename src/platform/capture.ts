@@ -32,13 +32,23 @@ export interface SessionInfo {
   options: RecordOptions;
 }
 export interface InputMove { t: number; x: number; y: number; c?: string }
-export interface InputClick { t: number; x: number; y: number; button: string; down: boolean; count: number }
+/** A control from the Accessibility API. Frame is global points: x, y, width, height. */
+export interface AxElement { role: string; label?: string; frame?: [number, number, number, number] }
+export interface InputClick { t: number; x: number; y: number; button: string; down: boolean; count: number; target?: AxElement }
 export interface CursorImage { id: string; file: string; hotspot: [number, number]; size: [number, number] }
 export interface RecordingSummary {
   projectDir: string;
   videoPath: string;
   session: SessionInfo;
-  input: { eventTap: boolean; moves: number; clicks: number; keys: number; cursors: CursorImage[] };
+  input: {
+    eventTap: boolean;
+    accessibility: boolean;
+    focusChanges: number;
+    moves: number;
+    clicks: number;
+    keys: number;
+    cursors: CursorImage[];
+  };
   clicks: InputClick[];
   moves: InputMove[];
 }

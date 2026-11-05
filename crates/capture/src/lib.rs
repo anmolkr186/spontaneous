@@ -3,6 +3,7 @@
 //!
 //! See docs/ARCHITECTURE.md §3.
 
+pub mod ax;
 pub mod clock;
 pub mod cursor;
 pub mod input;

@@ -6,6 +6,9 @@
 //!   polling button state when Input Monitoring isn't granted.
 //! - `keys.jsonl`: key down/up with modifiers (event tap only).
 //! - `scrolls.jsonl`: scroll deltas (event tap only).
+//! - `focus.jsonl`: frontmost app, window, page URL and focused control
+//!   (Accessibility only, see `ax`). Click-downs also carry the control they
+//!   landed on.
 //!
 //! Every line is flushed as it's written, so a crash keeps the track up to the
 //! last event. Coordinates are global display points.
@@ -20,6 +23,7 @@ use std::sync::{Arc, mpsc};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use crate::ax::{Ax, AxElement, FocusTracker};
 use crate::clock::SessionClock;
 use crate::cursor::{CursorAtlas, CursorImage};
 
@@ -117,6 +121,9 @@ pub struct Click {
   pub down: bool,
   /// 1 for a single click, 2 for a double click…
   pub count: i64,
+  /// The control under the cursor, on click-down, when Accessibility is granted.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub target: Option<AxElement>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -145,15 +152,15 @@ enum Event {
   Scroll(Scroll),
 }
 
-struct JsonLines {
+pub(crate) struct JsonLines {
   out: BufWriter<File>,
 }
 
 impl JsonLines {
-  fn create(path: &Path) -> std::io::Result<Self> {
+  pub(crate) fn create(path: &Path) -> std::io::Result<Self> {
     Ok(Self { out: BufWriter::new(File::create(path)?) })
   }
-  fn write<T: Serialize>(&mut self, value: &T) {
+  pub(crate) fn write<T: Serialize>(&mut self, value: &T) {
     if serde_json::to_writer(&mut self.out, value).is_ok() {
       let _ = self.out.write_all(b"\n");
       let _ = self.out.flush();
@@ -190,7 +197,7 @@ extern "C" fn on_event(_proxy: *mut c_void, kind: u32, event: CGEventRef, user: 
       };
       let down = matches!(kind, LEFT_DOWN | RIGHT_DOWN | OTHER_DOWN);
       let count = unsafe { CGEventGetIntegerValueField(event, FIELD_CLICK_STATE) };
-      Event::Click(Click { t, x: p.x, y: p.y, button: button.into(), down, count })
+      Event::Click(Click { t, x: p.x, y: p.y, button: button.into(), down, count, target: None })
     }
     KEY_DOWN | KEY_UP => {
       let mut buf = [0u16; 8];
@@ -280,6 +287,9 @@ impl EventTap {
 #[serde(rename_all = "camelCase")]
 pub struct InputSummary {
   pub event_tap: bool,
+  /// Clicks carry their target and the focus track is recorded.
+  pub accessibility: bool,
+  pub focus_changes: usize,
   pub moves: usize,
   pub clicks: usize,
   pub keys: usize,
@@ -289,6 +299,7 @@ pub struct InputSummary {
 pub struct InputRecorder {
   stop: Arc<AtomicBool>,
   tap: Option<EventTap>,
+  focus: Option<FocusTracker>,
   sampler: JoinHandle<(usize, Option<CursorAtlas>)>,
   writer: JoinHandle<(usize, usize)>,
   dir: PathBuf,
@@ -311,11 +322,17 @@ impl InputRecorder {
     let mut keys = JsonLines::create(&dir.join("keys.jsonl"))?;
     let mut scrolls = JsonLines::create(&dir.join("scrolls.jsonl"))?;
     let writer = std::thread::Builder::new().name("spontaneous-input-writer".into()).spawn(move || {
+      // Looked up here, not in the tap callback: macOS disables a tap that is
+      // slow to return, and an Accessibility call can take up to its timeout.
+      let ax = Ax::new();
       let (mut n_clicks, mut n_keys) = (0, 0);
       for event in rx {
         match event {
-          Event::Click(c) => {
-            n_clicks += c.down as usize;
+          Event::Click(mut c) => {
+            if c.down {
+              n_clicks += 1;
+              c.target = ax.as_ref().and_then(|ax| ax.element_at(c.x, c.y));
+            }
             clicks.write(&c)
           }
           Event::Key(k) => {
@@ -327,6 +344,11 @@ impl InputRecorder {
       }
       (n_clicks, n_keys)
     })?;
+
+    let focus = FocusTracker::start(&dir.join("focus.jsonl"), clock)?;
+    if focus.is_none() {
+      log::info!("input: no Accessibility grant; clicks have no targets and focus isn't tracked");
+    }
 
     let mut moves = JsonLines::create(&dir.join("moves.jsonl"))?;
     let mut atlas = CursorAtlas::new(cursors_dir).ok();
@@ -359,7 +381,7 @@ impl InputRecorder {
             let down = unsafe { CGEventSourceButtonState(COMBINED_SESSION_STATE, button) };
             if down != buttons[i] {
               buttons[i] = down;
-              let _ = tx.send(Event::Click(Click { t, x: p.x, y: p.y, button: name.into(), down, count: 1 }));
+              let _ = tx.send(Event::Click(Click { t, x: p.x, y: p.y, button: name.into(), down, count: 1, target: None }));
             }
           }
         }
@@ -369,7 +391,7 @@ impl InputRecorder {
       (count, atlas)
     })?;
 
-    Ok(Self { stop, tap, sampler, writer, dir: dir.to_path_buf() })
+    Ok(Self { stop, tap, focus, sampler, writer, dir: dir.to_path_buf() })
   }
 
   pub fn stop(self) -> InputSummary {
@@ -378,11 +400,17 @@ impl InputRecorder {
     if let Some(tap) = self.tap {
       tap.stop();
     }
+    let accessibility = self.focus.is_some();
+    let focus_changes = self.focus.map_or(0, FocusTracker::stop);
     let (moves, atlas) = self.sampler.join().unwrap_or((0, None));
     let (clicks, keys) = self.writer.join().unwrap_or((0, 0));
     let cursors = atlas.and_then(|a| a.finish().ok()).unwrap_or_default();
-    log::info!("input: {moves} moves, {clicks} clicks, {keys} keys, {} cursors in {}", cursors.len(), self.dir.display());
-    InputSummary { event_tap, moves, clicks, keys, cursors }
+    log::info!(
+      "input: {moves} moves, {clicks} clicks, {keys} keys, {focus_changes} focus changes, {} cursors in {}",
+      cursors.len(),
+      self.dir.display()
+    );
+    InputSummary { event_tap, accessibility, focus_changes, moves, clicks, keys, cursors }
   }
 }
 

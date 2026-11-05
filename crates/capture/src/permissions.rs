@@ -5,7 +5,7 @@
 //! | Screen Recording  | ScreenCaptureKit, system audio          | yes      |
 //! | Microphone        | voiceover / mic track                   | if mic   |
 //! | Input Monitoring  | click and key events (CGEventTap)       | no*      |
-//! | Accessibility     | focus tracking for auto-zoom (phase 3)  | no       |
+//! | Accessibility     | click targets and focus track (`ax`)    | no       |
 //!
 //! *Without Input Monitoring we still sample cursor position and mouse buttons,
 //! which needs no permission; only keystrokes are lost.
