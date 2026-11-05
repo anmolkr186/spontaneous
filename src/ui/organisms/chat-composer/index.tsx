@@ -25,6 +25,7 @@ import type { Effort, PickerModel } from "@/ui/molecules/model-picker";
 import { NotePin } from "@/ui/organisms/agent";
 import { formatTime } from "@/editor/model";
 import { blurIn } from "@/ui/tokens/motion";
+import { useCtaRole } from "@/ui/cta";
 import styles from "./chat-composer.module.css";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -220,6 +221,8 @@ export function ChatComposer({
 
   /* Send */
   const canSend = !running && !isListening && (text.trim().length > 0 || items.length > 0);
+  // Send competes for the panel's primary: a decision waiting elsewhere on the panel outranks it.
+  const sendRole = useCtaRole("run", canSend);
   const send = () => {
     if (!canSend) return;
     onSend?.(text.trim(), { attachments: items, model: model ?? modelState, thinking, effort });
@@ -307,7 +310,7 @@ export function ChatComposer({
           <Mic />
         </IconKey>
 
-        <IconKey label={running ? "Stop" : "Send"} shortcut={running ? undefined : "↵"} tooltip="top" variant={isListening ? "secondary" : "primary"}
+        <IconKey label={running ? "Stop" : "Send"} shortcut={running ? undefined : "↵"} tooltip="top" variant={isListening ? "secondary" : running ? "primary" : sendRole}
           className={styles.send} disabled={!running && !canSend} onClick={running ? onStop : send}>
           <Swap id={running ? "stop" : "send"}>{running ? <Square className={styles.stopGlyph} /> : <ArrowUp />}</Swap>
         </IconKey>

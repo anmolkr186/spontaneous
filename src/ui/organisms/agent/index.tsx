@@ -3,7 +3,9 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { Composer, Message, Thread, When, useThreadState } from "./runtime";
 import type { ReasoningMessagePartComponent, TextMessagePartComponent, ToolCallMessagePartComponent, ToolCallMessagePartProps } from "./runtime";
 import { ArrowUp, Check, ChevronDown, ChevronRight, Circle, Clock3, Crosshair, Eye, Film, Gauge, Minus, Scissors, Search, Square, Type, Wand2, X, ZoomIn } from "lucide-react";
-import { Kbd, Mark } from "@/ui/atoms";
+import { Kbd, Mark, RollText } from "@/ui/atoms";
+import { useCtaRole } from "@/ui/cta";
+import type { CtaIntent } from "@/ui/cta";
 import { formatTime } from "@/editor/model";
 import styles from "./agent.module.css";
 
@@ -285,7 +287,7 @@ export function AgentComposer({ meta, placeholder = "Ask the agent, or describe 
           {meta ?? <span className={styles.model}>Claude Code<ChevronDown size={12} /></span>}
         </div>
         <When condition={(s) => !s.thread.isRunning}>
-          <Composer.Send className={styles.send} aria-label="Send"><ArrowUp /></Composer.Send>
+          <SendKey />
         </When>
         <When condition={(s) => s.thread.isRunning}>
           <Composer.Cancel className={styles.send} aria-label="Stop"><Square size={11} fill="currentColor" /></Composer.Cancel>
@@ -295,19 +297,36 @@ export function AgentComposer({ meta, placeholder = "Ask the agent, or describe 
   );
 }
 
+/** Send is the panel's run action: primary once there's something to send, unless a decision is waiting. */
+function SendKey() {
+  const empty = useThreadState((s) => s.composer.isEmpty);
+  const role = useCtaRole("run", !empty);
+  return <Composer.Send className={styles.send} data-role={role} aria-label="Send"><ArrowUp /></Composer.Send>;
+}
+
 /* ───────────────────────── Suggestions ───────────────────────── */
 
-export interface Suggestion { id: string; label: string; onSelect: () => void }
+export interface Suggestion {
+  id: string;
+  label: string;
+  onSelect: () => void;
+  /** Give a suggestion an intent and it competes for the region's primary: "Apply 3 notes" is a run. Others stay quiet. */
+  intent?: CtaIntent;
+}
 
+/** Quiet one-tap prompts above the composer. One with an intent can rise to the light face when it's the most useful thing to do. */
 export function SuggestionChips({ items }: { items: Suggestion[] }) {
   if (!items.length) return null;
   return (
     <div className={styles.suggestions}>
-      {items.map((s) => (
-        <button key={s.id} type="button" className={styles.suggestion} onClick={s.onSelect}>{s.label}</button>
-      ))}
+      {items.map((s) => <SuggestionChip key={s.id} item={s} />)}
     </div>
   );
+}
+
+function SuggestionChip({ item }: { item: Suggestion }) {
+  const role = useCtaRole(item.intent ?? "navigate", !!item.intent, "secondary");
+  return <button type="button" className={styles.suggestion} data-role={item.intent ? role : undefined} onClick={item.onSelect}><RollText text={item.label} /></button>;
 }
 
 export { styles as agentStyles };

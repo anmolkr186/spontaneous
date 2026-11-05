@@ -15,6 +15,8 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { Check, ShieldCheck } from "lucide-react";
 import { Cell, Fold, Kbd, Key, Swap, Tag, Timecode, useNow } from "@/ui/atoms";
 import { Tray, TraySpacer, trayStyles } from "@/ui/molecules/tray";
+import { CtaKey, approvalLabels, proposedPrimary, resolveLabel } from "@/ui/cta";
+import type { CtaProposal, CtaRisk } from "@/ui/cta";
 import styles from "./approval-card.module.css";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -52,9 +54,16 @@ export interface ApprovalCardProps {
   expiresIn?: number;
   /** The countdown ran out. Called right before `onDeny({ reason: "timeout" })`. */
   onExpire?: () => void;
+  /** The tool asking, e.g. "replace_audio". Words the Approve and Deny keys ("Replace audio", "Keep current"). */
+  tool?: string;
+  /** How many things it affects, e.g. 3 takes. */
+  count?: number;
+  /** Labels the agent proposed for the keys. Shown when they pass the checks; otherwise the derived ones. */
+  cta?: CtaProposal;
   /** Show the "Always allow this action" checkbox. */
   allowAlways?: boolean;
   alwaysLabel?: string;
+  /** Fixed labels. Prefer `tool` and `cta`, which word the keys from what will happen. */
   approveLabel?: string;
   denyLabel?: string;
   editLabel?: string;
@@ -67,10 +76,10 @@ export interface ApprovalCardProps {
 
 type Decided = { outcome: "approved" | "denied"; by: DenyReason; at: number; always: boolean };
 
-const RISK: Record<ApprovalRisk, { word: string; level: number }> = {
-  low: { word: "Low risk", level: 1 },
-  medium: { word: "Medium risk", level: 2 },
-  high: { word: "High risk", level: 3 },
+const RISK: Record<ApprovalRisk, { word: string; level: number; cta: CtaRisk }> = {
+  low: { word: "Low risk", level: 1, cta: "safe" },
+  medium: { word: "Medium risk", level: 2, cta: "risky" },
+  high: { word: "High risk", level: 3, cta: "destructive" },
 };
 
 export function ApprovalCard({
@@ -90,14 +99,20 @@ export function ApprovalCard({
   onExpire,
   allowAlways = true,
   alwaysLabel = "Always allow this action",
-  approveLabel = "Approve",
-  denyLabel = "Deny",
+  tool,
+  count,
+  cta,
+  approveLabel,
+  denyLabel,
   editLabel = "Edit",
   shortcuts = true,
   label,
   className,
 }: ApprovalCardProps) {
   const id = useId();
+  const derived = tool ? approvalLabels(tool, count) : { approve: "Approve", deny: "Deny" };
+  const approveText = approveLabel ?? derived.approve;
+  const denyText = denyLabel ?? resolveLabel(cta?.secondary?.[0]?.label, derived.deny, { intent: "dismiss" }).label;
   const titleId = `${id}-title`, descId = `${id}-desc`, clockId = `${id}-clock`;
   const root = useRef<HTMLElement>(null);
   const row = useRef<HTMLDivElement>(null);
@@ -231,13 +246,12 @@ export function ApprovalCard({
               <TraySpacer />
               {onEdit && <Key variant="tertiary" aria-disabled={busy || undefined} onClick={() => !busy && onEdit()}>{editLabel}</Key>}
               <Key variant="tertiary" data-action="deny" aria-keyshortcuts="Escape" aria-disabled={busy || undefined} onClick={() => deny("user")}>
-                {denyLabel}
+                {denyText}
                 {shortcuts && <span className={styles.hint} aria-hidden><Kbd>Esc</Kbd></span>}
               </Key>
-              <Key variant="primary" data-action="approve" aria-keyshortcuts="Meta+Enter Control+Enter" loading={busy} onClick={() => void approve()}>
-                <Check aria-hidden />{approveLabel}
-                {shortcuts && <span className={cx(styles.hint, styles.collapsible)} aria-hidden><Kbd className={styles.faceKbd}>⌘↵</Kbd></span>}
-              </Key>
+              <CtaKey intent="decide" risk={RISK[risk ?? "low"].cta} count={count} label={approveText} proposal={proposedPrimary(cta, "decide")}
+                data-action="approve" aria-keyshortcuts="Meta+Enter Control+Enter" loading={busy} onClick={() => void approve()} icon={<Check aria-hidden />}
+                trailing={shortcuts && <span className={cx(styles.hint, styles.collapsible)} aria-hidden><Kbd className={styles.faceKbd}>⌘↵</Kbd></span>} />
             </div>
           </div>
         </Fold>

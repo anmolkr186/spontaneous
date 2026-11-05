@@ -73,6 +73,7 @@ diff.current?.acceptAll();`,
   source: src,
   sourcePath: "src/ui/organisms/inline-diff/index.tsx",
   props: [
+    { name: "cta", type: "CtaProposal", description: "Labels the agent proposed. Shown when they pass the CTA checks; otherwise the label derived from context." },
     { name: "original", type: "string", description: "The text as it is now." },
     { name: "suggested", type: "string", description: "The text the agent suggests, diffed word by word against original." },
     { name: "changes", type: "DiffSegment[]", description: "Pre-computed { type: \"equal\", text } and { type: \"change\", remove, insert } segments, instead of original and suggested. New input starts a new review." },

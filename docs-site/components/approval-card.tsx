@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { AudioLines, Trash2 } from "lucide-react";
 import { Timecode } from "@/ui/atoms";
 import { ApprovalCard } from "@/ui/organisms/approval-card";
+import { CtaRegion } from "@/ui/cta";
 import src from "@/ui/organisms/approval-card/index.tsx?raw";
 import { blurIn } from "@/ui/tokens/motion";
 import { AgentSays, DemoPanel, UserSays, useScript } from "../demo";
@@ -18,7 +19,7 @@ function Demo() {
   ]);
   return (
     <div ref={root}>
-      <DemoPanel>
+      <CtaRegion name="agent"><DemoPanel>
         <UserSays>Clean up the narration on the Projects demo and drop the takes I didn't use.</UserSays>
         <AgentSays status="Needs you">
           <ApprovalCard
@@ -26,6 +27,7 @@ function Demo() {
             title="Replace the recording's audio with the cleaned track"
             description="Room hum removed and levels evened out"
             risk="medium"
+            tool="replace_audio"
             icon={<AudioLines />}
             details={[
               { label: "Track", value: "Microphone" },
@@ -42,6 +44,8 @@ function Demo() {
                 title="Delete 3 unused takes"
                 description="Takes 2, 3 and 5 aren't on the timeline"
                 risk="high"
+                tool="delete_takes"
+                count={3}
                 icon={<Trash2 />}
                 details={[
                   { label: "Takes", value: "Take 2, Take 3, Take 5" },
@@ -55,7 +59,7 @@ function Demo() {
             </motion.div>
           )}
         </AgentSays>
-      </DemoPanel>
+      </DemoPanel></CtaRegion>
     </div>
   );
 }
@@ -70,6 +74,7 @@ export const entry: DocEntry = {
   description: "The agent asks before it does something hard to undo: what it wants to do, how risky it is, and exactly what will change. A decision blurs the card away and the tray glides down to one resolved row with a check or cross that draws itself.",
   demo: () => <Demo />,
   usage: `import { ApprovalCard } from "@/ui/organisms/approval-card";
+import { CtaRegion } from "@/ui/cta";
 
 // One card per pending tool call. Return a promise to show the key working.
 <ApprovalCard
@@ -94,6 +99,9 @@ export const entry: DocEntry = {
   source: src,
   sourcePath: "src/ui/organisms/approval-card/index.tsx",
   props: [
+    { name: "tool", type: "string", description: "The tool asking. Words the keys: replace_audio gives Replace audio / Keep current; delete_takes with count 3 gives Delete 3 takes / Keep takes." },
+    { name: "count", type: "number", description: "How many things it affects." },
+    { name: "cta", type: "CtaProposal", description: "Labels the agent proposed. Shown when they pass the CTA checks; otherwise the label derived from context." },
     { name: "title", type: "string", description: "The action in the app's words. Also the card's accessible name." },
     { name: "description", type: "ReactNode", description: "One line of context under the title. Truncates." },
     { name: "risk", type: "\"low\" | \"medium\" | \"high\"", description: "A tag with a word and a three-cell gauge. Only high takes the rec tone. Leave out to hide it." },

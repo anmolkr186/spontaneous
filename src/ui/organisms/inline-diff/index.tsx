@@ -19,6 +19,8 @@ import { Tray, TraySpacer } from "@/ui/molecules/tray";
 import { motionTokens } from "@/ui/tokens/motion";
 import { diffWords, textOf } from "./diff";
 import type { DiffSegment } from "./diff";
+import { CtaKey, diffLabel, proposedPrimary } from "@/ui/cta";
+import type { CtaProposal } from "@/ui/cta";
 import styles from "./inline-diff.module.css";
 
 export { diffWords } from "./diff";
@@ -54,6 +56,8 @@ export interface InlineDiffProps {
   label?: ReactNode;
   /** Right of the tray title. */
   meta?: ReactNode;
+  /** Labels the agent proposed for the main key. Shown when they pass the checks; otherwise the derived label. */
+  cta?: CtaProposal;
   className?: string;
 }
 
@@ -68,7 +72,7 @@ function describe(c: Extract<DiffSegment, { type: "change" }>) {
 }
 
 export const InlineDiff = forwardRef<InlineDiffHandle, InlineDiffProps>(function InlineDiff(
-  { original = "", suggested = "", changes, onChange, onDone, label, meta, className },
+  { original = "", suggested = "", changes, onChange, onDone, label, meta, cta, className },
   ref,
 ) {
   const reduce = useReducedMotion();
@@ -288,7 +292,7 @@ export const InlineDiff = forwardRef<InlineDiffHandle, InlineDiffProps>(function
             <IconKey label="Next change" size="sm" tooltip="top" onClick={() => step(1)}><ChevronRight /></IconKey>
           </span>
           <Key size="sm" variant="tertiary" onClick={() => decideAll("rejected")}>Reject all</Key>
-          <Key size="sm" variant="primary" onClick={() => decideAll("accepted")}>Accept all</Key>
+          <CtaKey size="sm" intent="review" count={left} label={diffLabel(left)} proposal={proposedPrimary(cta, "review")} onClick={() => decideAll("accepted")} />
         </>
       )}
     </Swap>

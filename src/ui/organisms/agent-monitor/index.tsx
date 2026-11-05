@@ -21,6 +21,7 @@ import { DrawCheck, Fold, IconKey, Kbd, Key, Mark, RollNumber, RollText, Swap, f
 import { Tray, TrayCard, TraySpacer, trayStyles } from "@/ui/molecules/tray";
 import { blurIn, motionTokens } from "@/ui/tokens/motion";
 import { AutoHeight } from "@/ui/atoms";
+import { CtaKey, approvalLabels } from "@/ui/cta";
 import styles from "./agent-monitor.module.css";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -50,6 +51,10 @@ export interface MonitorAsk {
   action: string;
   /** The tool's icon, before the action. */
   icon?: ReactNode;
+  /** The tool asking, e.g. "export_overwrite". Words the Allow key ("Overwrite export"). */
+  tool?: string;
+  /** A label the agent proposed for Allow. */
+  label?: string;
 }
 
 export interface AgentMonitorProps {
@@ -251,7 +256,7 @@ export function AgentMonitor({
                         <span className={styles.askHint}><Kbd>↵</Kbd> allow <Kbd>esc</Kbd> decline</span>
                         <TraySpacer />
                         {onDecline && <Key size="sm" variant="tertiary" onClick={onDecline}>Decline</Key>}
-                        {onAllow && <Key size="sm" variant="primary" onClick={onAllow}>Allow</Key>}
+                        {onAllow && <CtaKey size="sm" intent="decide" risk="risky" label={ask?.tool ? approvalLabels(ask.tool).approve : "Allow"} proposal={ask?.label} onClick={onAllow} />}
                       </div>
                     </div>
                   </Fold>

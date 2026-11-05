@@ -22,6 +22,8 @@ import { DrawCheck, Duration, Fold, IconKey, Key, RaySpinner, RollNumber, Shimme
 import { Tray, TraySpacer } from "@/ui/molecules/tray";
 import { motionTokens } from "@/ui/tokens/motion";
 import { AutoHeight } from "@/ui/atoms";
+import { CtaKey, planLabel, proposedPrimary } from "@/ui/cta";
+import type { CtaProposal } from "@/ui/cta";
 import styles from "./agent-plan.module.css";
 
 export type PlanStepStatus = "pending" | "running" | "done" | "failed";
@@ -69,6 +71,8 @@ export interface AgentPlanProps {
   estimate?: string;
   /** When the run started (ms since epoch). Defaults to the moment status turns "running". */
   startedAt?: number;
+  /** Labels the agent proposed for Run plan, e.g. "Tighten the walkthrough". Shown when it passes the checks; otherwise "Run 5 edits". */
+  cta?: CtaProposal;
   className?: string;
 }
 
@@ -91,6 +95,7 @@ export function AgentPlan({
   onRetry,
   estimate,
   startedAt,
+  cta,
   className,
 }: AgentPlanProps) {
   const [own, setOwn] = useState(defaultSteps);
@@ -197,7 +202,8 @@ export function AgentPlan({
               <span className={styles.hint}>Drag to reorder</span>
               <TraySpacer />
               {onCancel && <Key size="sm" variant="tertiary" onClick={onCancel}>Cancel</Key>}
-              <Key size="sm" variant="primary" disabled={!steps.length} onClick={() => onRun?.(steps)}>Run plan</Key>
+              <CtaKey size="sm" intent="run" count={steps.length} label={planLabel("draft", steps.length)} proposal={proposedPrimary(cta, "run")}
+                disabled={!steps.length} reason="Add a step first" onClick={() => onRun?.(steps)} />
             </>
           )}
           {mode === "running" && (
@@ -378,7 +384,7 @@ function PlanRow({ ref, step, index, last, draft, editing, hintId, onEdit, onRen
           <Fold open={failed}>
             <div className={styles.failure}>
               {step.error && <p className={styles.error}>{step.error}</p>}
-              {onRetry && <Key size="sm" variant="secondary" onClick={onRetry}><RotateCcw />Retry from here</Key>}
+              {failed && onRetry && <CtaKey size="sm" intent="run" icon={<RotateCcw />} label={planLabel("failed", 0, index)} onClick={onRetry} />}
             </div>
           </Fold>
         </div>

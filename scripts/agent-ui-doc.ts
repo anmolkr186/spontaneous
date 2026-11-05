@@ -3,7 +3,7 @@
  * agents read and the docs site never drift apart. Run: npm run docs:agent-ui
  */
 import { writeFileSync } from "node:fs";
-import { CHOOSING, SURFACES, SURFACE_GROUPS } from "../src/ui/agent-ui/catalog.ts";
+import { CHOOSING, CTA_EXAMPLES, CTA_RULES, SURFACES, SURFACE_GROUPS } from "../src/ui/agent-ui/catalog.ts";
 
 const words = (id: string) => id.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/^./, (c) => c.toUpperCase());
 const nameOf = (component: string) => component.split(/,\s*/).map(words).join(", ");
@@ -31,6 +31,16 @@ Ask these in order; the first that matches wins.
 |---|---|
 ${CHOOSING.map(([w, u]) => `| ${w} | ${named(u)} |`).join("\n")}
 
+## Writing a CTA
+
+Any UI tool call may carry \`"cta": { "primary": { "label", "intent" }, "secondary": [{ "label" }] }\`. The app shows your label when it passes these rules and its own derived label otherwise, so a key is never missing or wrong. Which key is primary on a surface is the app's call: one per surface, ranked by intent, and Export waits while any work or decision is pending.
+
+${CTA_RULES.map((r) => `- ${r}`).join("\n")}
+
+| Intent | Good | Turned down |
+|---|---|---|
+${CTA_EXAMPLES.map(([i, g, b]) => `| ${i} | ${g} | ${b} |`).join("\n")}
+
 ## At a glance
 
 | Moment | Component | Import | Trigger |
@@ -51,6 +61,7 @@ ${s.moment}
 - **Trigger:** ${source(s)}
 ${s.youSay ? `- **You say:** “${s.youSay}”\n` : ""}- **Agent says:** “${s.agentSays}”
 - **Props:** ${s.props}
+${s.keys ? `- **Keys:** ${named(s.keys)}\n` : ""}
 ${s.instead ? `- **Instead:** ${named(s.instead)}\n` : ""}${s.payload ? `\n\`\`\`js\n${s.payload}\n\`\`\`\n` : ""}`);
   }
 }

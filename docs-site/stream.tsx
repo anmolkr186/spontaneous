@@ -40,6 +40,7 @@ export function StreamSection({ id }: { id: string }) {
         <tbody>
           <tr><td>Trigger</td><td className={styles.plain}><TriggerTag s={s} /></td></tr>
           <tr><td>Props from it</td><td className={styles.plain}>{named(s.props)}</td></tr>
+          {s.keys && <tr><td>Keys</td><td className={styles.plain}>{named(s.keys)}</td></tr>}
           {s.instead && <tr><td>Instead</td><td className={styles.plain}>{named(s.instead)}</td></tr>}
         </tbody>
       </table>

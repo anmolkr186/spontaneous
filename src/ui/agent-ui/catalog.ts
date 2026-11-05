@@ -45,6 +45,8 @@ export interface AgentSurface {
   props: string;
   /** When to pick something else, and what. */
   instead?: string;
+  /** Its keys: which one competes for the primary, with what intent, and how it's worded. */
+  keys?: string;
 }
 
 export type SurfaceGroup = "While it thinks" | "While it works" | "Before it acts" | "What it changed" | "Answers and suggestions" | "Around the run";
@@ -78,6 +80,31 @@ export const CHOOSING: [when: string, use: string][] = [
   ["The agent replied to a specific note", "note-thread on that note; resolve_annotation links the edits"],
   ["A turn ends", "message-actions under the last text; agent-checkpoints saves a checkpoint if anything changed"],
   ["Something finished outside the panel (export done, copy, background error)", "toaster"],
+];
+
+/**
+ * Wording the keys. Any UI tool call may carry
+ *   "cta": { "primary": { "label": "Tighten the intro", "intent": "run" }, "secondary": [{ "label": "Keep current" }] }
+ * The app shows the agent's label when it passes these rules and its own
+ * derived label otherwise (src/ui/cta/validate.ts), so a CTA is never missing
+ * or wrong. Which key is primary on a surface is decided by the app, not the agent.
+ */
+export const CTA_RULES: string[] = [
+  "Start with a verb that says what happens: Apply, Run, Cut, Zoom, Replace, Allow, Accept, Use, Export. Never Confirm, OK, Yes, Submit, Continue.",
+  "Name the object, and a count or a time when it helps: “Apply zoom at 0:12”, “Delete 3 takes”, “Run 5 edits”.",
+  "Four words and 28 characters at most. Sentence case. No !, ?, … or emoji.",
+  "A number must match what the action touches: “Apply 3 notes” only when there are 3.",
+  "Destructive actions name what they destroy (“Overwrite export”, not “Overwrite”); the key turns red on its own.",
+  "The intent ranks it: decide (approve, allow) > run (start work) > review (accept changes) > apply (take a suggestion) > finish (export) > navigate. Dismiss (Deny, Keep current, Cancel) is never primary.",
+  "Leave the label out when the derived one already says it: the app writes “Run 5 edits”, “Accept 4 changes”, “Allow for an hour” itself.",
+];
+
+export const CTA_EXAMPLES: [intent: string, good: string, bad: string][] = [
+  ["decide", "Replace audio · Delete 3 takes · Allow for an hour", "Confirm · OK · Yes, do it!"],
+  ["run", "Run 5 edits · Apply zoom at 0:12 · Tighten the intro", "Apply · Go · Start the whole thing now"],
+  ["review", "Accept 4 changes · Keep the shorter one", "Accept · Looks good 🎉"],
+  ["apply", "Use Lid Rise · Apply as 3 edits", "Use it · Apply suggestion"],
+  ["finish", "Export 1080p · Export for Slack", "Done · Finish"],
 ];
 
 export const SURFACES: AgentSurface[] = [
@@ -134,6 +161,7 @@ export const SURFACES: AgentSurface[] = [
     payload: `propose_plan({
   "title": "Tighten the Projects walkthrough",
   "estimate": "~40s",
+  "cta": { "primary": { "label": "Tighten the walkthrough", "intent": "run" } },
   "steps": [
     { "id": "s1", "title": "Cut the dead air after the form", "tool": "cut", "from": 42, "to": 51 },
     { "id": "s2", "title": "Speed up the typing to 2×", "tool": "set_speed", "from": 20, "to": 31 },
@@ -142,6 +170,7 @@ export const SURFACES: AgentSurface[] = [
 })
 // → returns the steps in the person's order; each later write call carries "step": "s2"`,
     props: "steps from the call; status draft until Run plan resolves the tool call; then a step is running from its first tool_use with that step id and done at its last result; failed carries the error; onRetry re-sends from that step.",
+    keys: "Primary: Run 5 edits (run; derived from the step count, or the agent's cta). Secondary: Cancel. Failed: Retry from step 3 (run). Done: Run again (secondary).",
     instead: "One or two edits: just do them (tool-call). A single risky action: approval-card.",
   },
   {
@@ -168,6 +197,7 @@ export const SURFACES: AgentSurface[] = [
     agentSays: "Applying the seven edits, then rendering at 1080p. I'll stop and ask before writing over the old export.",
     payload: `{ "job": "export", "state": "running", "step": { "label": "Render at 1080p", "kind": "render", "since": 1730900000000 }, "cost": 0.15 }`,
     props: "state from the run (running, waiting when a permission prompt is pending, finished, failed); steps from finished tool calls; cost from result.total_cost_usd so far; ask from a pending approval.",
+    keys: "Primary while it asks: the tool's verb, e.g. Overwrite export (decide). Secondary: Decline, Pause, Cancel.",
     instead: "Short runs: the tool-call group is enough.",
   },
   {
@@ -203,6 +233,7 @@ export const SURFACES: AgentSurface[] = [
     agentSays: "Before I cut it down: how long should it feel?",
     payload: `ask_user({ "question": "What pace should the launch cut have?", "options": ["Punchy, 20s", "Walkthrough, 45s", "Feature trio, 3×10s"] })`,
     props: "question and 2–4 options; the answer goes back as the tool result.",
+    keys: "No primary: every option is equal, so they stay keys with number caps.",
     instead: "It has a favorite and a reason: shot-suggestion. It's about to do something risky: approval-card.",
   },
   {
@@ -215,8 +246,10 @@ export const SURFACES: AgentSurface[] = [
     agentSays: "The cleaned track is ready. Replacing the recording's audio needs your OK.",
     payload: `{ "type": "permission_request", "tool": "mcp__spontaneous__replace_audio",
   "input": { "track": "Microphone", "length": 134, "changes": "Hum removed, peaks down 3 dB" },
-  "risk": "medium", "expiresIn": 60 }`,
+  "risk": "medium", "expiresIn": 60,
+  "cta": { "primary": { "label": "Replace audio", "intent": "decide" }, "secondary": [{ "label": "Keep current" }] } }`,
     props: "title from the tool's action label; details from the input (times in the time face); risk from the tool's class; onApprove/onDeny answer the prompt over stdin; Always allow pins it in autonomy-dial.",
+    keys: "Primary: the tool's own verb and object, e.g. Replace audio (decide; red when the risk is high). Secondary: Keep current (dismiss) and Edit.",
     instead: "A right the agent doesn't have at all: permission-request. Reversible edits: run them and offer Undo.",
   },
   {
@@ -230,9 +263,11 @@ export const SURFACES: AgentSurface[] = [
     payload: `request_permission({
   "action": "write to ~/Movies/Spontaneous", "target": "Files · ~/Movies/Spontaneous", "risk": "risky",
   "reason": "The export is ready. I'll write the video, its captions and a poster frame there.",
+  "cta": { "primary": { "label": "Allow saving here", "intent": "decide" } },
   "preview": [ { "label": "Projects-demo.mp4", "meta": "182 MB" }, { "label": "Projects-demo.srt", "meta": "4 KB" } ]
 })`,
     props: "agent, action, target, risk, reason, preview straight from the call; scopes once / for an hour / always; the decision returns as the tool result and is remembered by the app.",
+    keys: "Primary: Allow once / Allow for an hour / Always allow, following the scope switch (decide). Secondary: Deny.",
     instead: "Approving one specific action inside rights it already has: approval-card.",
   },
   {
@@ -279,10 +314,12 @@ export const SURFACES: AgentSurface[] = [
     payload: `propose_text_edit({
   "target": "captions", "from": 0, "to": 14, "label": "Captions · Make it shorter",
   "original": "So, um, this is the Projects page. And here you just, uh, click the Create button…",
-  "suggested": "This is the Projects page. Click the Create button…"
+  "suggested": "This is the Projects page. Click the Create button…",
+  "cta": { "primary": { "label": "Keep the shorter one", "intent": "review" } }
 })
 // → returns the text as decided, change by change`,
     props: "original and suggested (or precomputed changes); label from target and the ask; onDone returns the final text as the tool result.",
+    keys: "Primary: Accept 4 changes (review; the count rolls as you decide). Secondary: Reject all; per change Accept (Y) and Reject (N).",
     instead: "Edits to the timeline itself: tool-call, never a text diff.",
   },
   {
@@ -306,6 +343,7 @@ export const SURFACES: AgentSurface[] = [
     agentSays: "Zoomed to 1.6× on the Create button for the click at 0:13, and cut the pause at 0:58.",
     payload: `{ "type": "result", "subtype": "success", "duration_ms": 9400, "total_cost_usd": 0.04 }`,
     props: "text = the turn's final text; versions grow with each regenerate; onPreview plays the time range the turn touched; onFeedback is logged locally.",
+    keys: "No primary: the bar is quiet tertiary keys.",
     instead: "While it streams: no bar; show Stop in the composer.",
   },
 
@@ -319,12 +357,14 @@ export const SURFACES: AgentSurface[] = [
     youSay: "What should change in the first fifteen seconds?",
     agentSays: "Trim the filler at the start [0:00]. Then zoom in on the Create button as you click it [0:11][note 2]; it's small and hard to read on a phone.",
     payload: `answer_with_moments({
+  "cta": { "primary": { "label": "Apply as 2 edits", "intent": "apply" } },
   "segments": [ { "text": "Trim the filler at the start.", "cite": ["m1"] }, { "text": "Then zoom in on the Create button as you click it.", "cite": ["m2", "n2"] } ],
   "moments": [ { "id": "m1", "at": 0, "kind": "transcript", "quote": "So, um, this is…", "highlight": ["um"] },
                { "id": "m2", "at": 11.2, "kind": "click", "title": "Click on Create" },
                { "id": "n2", "at": 12, "kind": "note", "pin": 2, "title": "zoom here, it's too small" } ]
 })`,
     props: "segments and moments from the call; streaming while text deltas arrive; onSeek moves the playhead; action \"Apply as edits\" starts a plan.",
+    keys: "Primary: Apply as 3 edits (apply; held while it streams). Secondary: Go to 0:12 in the preview.",
     instead: "A plain reply with no claims about the recording: text in the thread.",
   },
   {
@@ -335,10 +375,11 @@ export const SURFACES: AgentSurface[] = [
     trigger: { source: "tool", event: "suggest_shot", status: "proposed" },
     youSay: "The start feels static. Make it feel more like a launch.",
     agentSays: "I'd open on Lid Rise: the screen powers on, a strong opener for a launch.",
-    payload: `suggest_shot({ "context": "0:00–0:06", "options": [
+    payload: `suggest_shot({ "context": "0:00–0:06", "cta": { "primary": { "label": "Use Lid Rise first", "intent": "apply" } }, "options": [
   { "id": "lid-rise", "label": "Lid Rise", "reason": "The lid opens and the screen powers on…", "confidence": 2 },
   { "id": "orbit-in", "label": "Orbit In", "reason": "A slow orbit settles on the screen…", "confidence": 1 } ] })`,
     props: "options in order (first is the pick); onAccept applies set_template; onUndo reverts it.",
+    keys: "Primary: Use Lid Rise (apply; follows the option on show). Secondary: Other options, then Undo.",
     instead: "No clear favorite: ask (ask_user) with the options side by side.",
   },
 
@@ -351,6 +392,7 @@ export const SURFACES: AgentSurface[] = [
     trigger: { source: "stream", event: "all stream-json events, converted to thread parts" },
     agentSays: "(container) Text deltas become text parts, thinking becomes reasoning, tool_use becomes tool parts rendered by this catalog.",
     props: "tools = { by_name: { ask_user: AskCard, propose_plan: AgentPlan, propose_text_edit: InlineDiff, … } }; anything unlisted falls back to ToolCall.",
+    keys: "Suggestion chips with an intent compete for the panel's primary: Apply 2 notes (run) rises to the light face when nothing else is waiting.",
   },
   {
     id: "chat-composer",
@@ -361,6 +403,7 @@ export const SURFACES: AgentSurface[] = [
     youSay: "Cut the pause before the share dialog [frame 0:12] [note 2]",
     agentSays: "(input) Attachments go to the agent as context: a frame as render_frame(t), a note by id.",
     props: "onSend(text, { attachments, model }); running shows Stop; transcript from local dictation.",
+    keys: "Send is the panel's run action: primary once there's text, secondary while a decision waits elsewhere on the panel.",
   },
   {
     id: "model-picker",

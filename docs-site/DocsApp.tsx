@@ -5,6 +5,10 @@ import { Fold, IconKey, Key, Mark, Tag } from "@/ui/atoms";
 import { Switcher } from "@/ui/molecules";
 import { CATEGORIES, ENTRIES } from "./registry";
 import { HarnessPage, StreamSection } from "./stream";
+import { ArbitrationDemo, LabelTester } from "./actions/arbitration";
+import { PRIORITY } from "@/ui/cta";
+import type { CtaIntent } from "@/ui/cta";
+import { CTA_EXAMPLES, CTA_RULES } from "@/ui/agent-ui/catalog";
 import { DETAILS } from "./details";
 import type { DocEntry } from "./registry";
 import styles from "./docs.module.css";
@@ -17,6 +21,7 @@ const FOUNDATIONS = [
   { id: "type", name: "Type" },
   { id: "motion", name: "Motion" },
   { id: "interaction", name: "Interaction" },
+  { id: "actions", name: "Actions" },
   { id: "harness", name: "Agent harness" },
 ] as const;
 type FoundationId = (typeof FOUNDATIONS)[number]["id"];
@@ -222,6 +227,7 @@ function Foundation({ id, go }: { id: FoundationId; go: (id: string) => void }) 
       {id === "type" && <TypePage />}
       {id === "motion" && <MotionPage />}
       {id === "interaction" && <InteractionPage />}
+      {id === "actions" && <ActionsPage />}
       {id === "harness" && <HarnessPage go={go} />}
     </>
   );
@@ -379,6 +385,49 @@ const AGENT_MOTION: [string, string, string][] = [
   ["Pop", "spring.pop · --ease-pop", "Small marks landing (a vote, a check ring). The only place a bounce is allowed."],
   ["Stagger", "--stagger", "Rows arriving together come a beat apart, 60ms. Keep the whole stagger under 400ms."],
 ];
+
+const INTENT_ROWS: [CtaIntent, string, string][] = [
+  ["decide", "The agent is waiting on you", "Replace audio · Allow for an hour · Delete 3 takes"],
+  ["run", "Start work", "Run 5 edits · Apply zoom at 0:12 · Send"],
+  ["review", "Accept or reject what the agent proposed", "Accept 4 changes"],
+  ["apply", "Take one suggestion", "Use Lid Rise · Apply as 3 edits"],
+  ["finish", "Wrap up; waits while any decide or run is pending", "Export 1080p"],
+  ["navigate", "Go somewhere", "Back to clip · Watch"],
+  ["dismiss", "The way out. Never primary", "Keep current · Deny · Cancel"],
+];
+
+function ActionsPage() {
+  return (
+    <>
+      <p className={styles.lede}>Every key that moves the work forward says what it will do, and each surface shows one primary: the action that matters most right now. The app decides which; the agent may word it.</p>
+      <h2 className={styles.h2}>One primary per surface</h2>
+      <p className={styles.p}>Surfaces are regions: the title bar, the notes list, the agent panel, the stage. Every key that could be primary is a <code>CtaKey</code> with an intent, and the region elects one by rank. A tie goes to the newest: the card that just arrived, or Send once you've typed. The rest step down to secondary. Export waits while any region has a decision or work pending.</p>
+      <table className={styles.table}>
+        <thead><tr><th>Intent</th><th>Rank</th><th>When</th><th>Keys</th></tr></thead>
+        <tbody>{INTENT_ROWS.map(([i, when, keys]) => <tr key={i}><td>{i}</td><td>{PRIORITY[i]}</td><td className={styles.plain}>{when}</td><td className={styles.plain}>{keys}</td></tr>)}</tbody>
+      </table>
+      <h3 className={styles.h3}>Step through a session</h3>
+      <p className={styles.p}>An editor-shaped window with three regions in one election. Change the moment and watch the one primary per region move and the labels follow the notes.</p>
+      <ArbitrationDemo />
+      <h2 className={styles.h2}>Labels</h2>
+      <p className={styles.p}>The app derives a label from context for every key (<code>src/ui/cta/derive.ts</code>), so a key is never missing or wrong. The agent may propose its own with any UI tool call; it is shown when it passes these checks (<code>validate.ts</code>) and replaced by the derived one when it doesn't.</p>
+      <ul className={styles.ul}>{CTA_RULES.map((r) => <li key={r}>{r}</li>)}</ul>
+      <table className={styles.table}>
+        <thead><tr><th>Intent</th><th>Good</th><th>Turned down</th></tr></thead>
+        <tbody>{CTA_EXAMPLES.map(([i, g, b]) => <tr key={i}><td>{i}</td><td className={styles.plain}>{g}</td><td className={styles.plain}>{b}</td></tr>)}</tbody>
+      </table>
+      <h3 className={styles.h3}>Word it like the agent</h3>
+      <LabelTester />
+      <h2 className={styles.h2}>Motion</h2>
+      <ul className={styles.ul}>
+        <li>A key gaining the primary crossfades from the machined key to the light face over 240ms; losing it fades back. The weight stays the same, so nothing shifts.</li>
+        <li>A label that changes with context rolls: the old words rise into a 3px blur as the new ones arrive, and the key glides to its new width.</li>
+        <li>A destructive primary takes a red face, the one place a primary takes a hue.</li>
+        <li>Reduced motion: the material swaps and labels change instantly.</li>
+      </ul>
+    </>
+  );
+}
 
 const RULES: [string, string, string][] = [
   ["Hover", "Background or text lightens", "120–160ms, --ease-standard. Only on things you can click."],

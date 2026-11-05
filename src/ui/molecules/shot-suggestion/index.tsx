@@ -16,6 +16,8 @@ import { Cell, DrawCheck, Fold, Key, RollText, Swap, Tag } from "@/ui/atoms";
 import { AutoHeight } from "@/ui/atoms";
 import { Tray, TraySpacer } from "@/ui/molecules/tray";
 import { blurIn, motionTokens } from "@/ui/tokens/motion";
+import { CtaKey, proposedPrimary, shotLabel } from "@/ui/cta";
+import type { CtaProposal } from "@/ui/cta";
 import styles from "./shot-suggestion.module.css";
 
 export type Confidence = 1 | 2 | 3;
@@ -53,6 +55,8 @@ export interface ShotSuggestionProps {
   onUndo?: (option: ShotOption) => void;
   /** How long Undo stays after accepting, in ms. */
   undoFor?: number;
+  /** Labels the agent proposed for the main key. Shown when they pass the checks; otherwise the derived label. */
+  cta?: CtaProposal;
   className?: string;
 }
 
@@ -83,6 +87,7 @@ export function ShotSuggestion({
   onAccept,
   onUndo,
   undoFor = 5000,
+  cta,
   className,
 }: ShotSuggestionProps) {
   const reduce = useReducedMotion();
@@ -155,7 +160,7 @@ export function ShotSuggestion({
           <ConfidenceCells value={level(current.confidence)} word />
           <TraySpacer />
           {options.length > 1 && <OptionsMenu options={options} value={at} onPick={pick} />}
-          <Key ref={acceptKey} size="sm" variant="secondary" onClick={accept}>Accept</Key>
+          <CtaKey ref={acceptKey} size="sm" intent="apply" label={shotLabel(current.label)} proposal={at === 0 ? proposedPrimary(cta, "apply") : undefined} onClick={accept} />
         </>
       )}
     </Swap>

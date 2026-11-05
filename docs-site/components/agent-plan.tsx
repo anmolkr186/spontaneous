@@ -111,6 +111,7 @@ export const entry: DocEntry = {
   source: src,
   sourcePath: "src/ui/organisms/agent-plan/index.tsx",
   props: [
+    { name: "cta", type: "CtaProposal", description: "Labels the agent proposed. Shown when they pass the CTA checks; otherwise the label derived from context." },
     { name: "title", type: "string", description: "The goal of the plan. The card's heading and the list's accessible name." },
     { name: "steps", type: "PlanStep[]", description: "Controlled steps: { id, title, tool?, from?, to?, status?, duration?, startedAt?, error? }. Pair with onChange." },
     { name: "defaultSteps", type: "PlanStep[] = []", description: "Initial steps when uncontrolled; edits stay inside the component." },

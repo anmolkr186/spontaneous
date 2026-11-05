@@ -85,7 +85,8 @@ function Demo() {
             moments={MOMENTS}
             streaming={n < TOTAL}
             onSeek={() => {}}
-            action={{ label: "Apply as edits", onClick: () => {} }}
+            action={{ onClick: () => {} }}
+            edits={2}
           />
         </AgentSays>
       </DemoPanel>
@@ -122,6 +123,8 @@ export const entry: DocEntry = {
   source: src,
   sourcePath: "src/ui/organisms/cited-answer/index.tsx",
   props: [
+    { name: "edits", type: "number", description: "How many edits the action makes. Words it: Apply as 2 edits." },
+    { name: "cta", type: "CtaProposal", description: "Labels the agent proposed. Shown when they pass the CTA checks; otherwise the label derived from context." },
     { name: "segments", type: "CitedSegment[]", description: "{ text, cite?, paragraph? } in order. cite lists moment ids, one marker each after the text; paragraph starts a new paragraph. While streaming, only append." },
     { name: "moments", type: "Moment[]", description: "{ id, at, end?, title, kind, quote?, highlight?, thumb?, pin? }. kind is \"frame\", \"transcript\", \"note\" or \"click\"; one chip each, in this order." },
     { name: "streaming", type: "boolean = false", description: "More text is coming: words rise in, markers pop in after their sentence, a cell pulses at the end, the action waits." },

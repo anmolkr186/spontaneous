@@ -7,6 +7,7 @@ import { Tooltip } from "@/ui/base/tooltip/tooltip";
 import type { Note } from "@/editor/model";
 import { formatTime } from "@/editor/model";
 import { motionTokens } from "@/ui/tokens/motion";
+import { CtaKey, noteActionLabel } from "@/ui/cta";
 import styles from "./molecules.module.css";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
@@ -441,7 +442,7 @@ export function NoteCard({ note, index, selected, onSeek, onApply, onDismiss, on
           {note.status === "open" && (
             <>
               <Key size="sm" variant="tertiary" onClick={stop(onDismiss)}>Dismiss</Key>
-              <Key size="sm" variant="secondary" onClick={stop(onApply)}>Apply</Key>
+              <CtaKey size="sm" intent="run" role="secondary" label={noteActionLabel(note.intents)} onClick={stop(onApply)} />
             </>
           )}
           {note.status === "queued" && (

@@ -19,6 +19,8 @@ import { Switcher } from "@/ui/molecules";
 import { Tray, TraySpacer, trayStyles } from "@/ui/molecules/tray";
 import { formatTime } from "@/editor/model";
 import { motionTokens } from "@/ui/tokens/motion";
+import { CtaKey, proposedPrimary } from "@/ui/cta";
+import type { CtaProposal } from "@/ui/cta";
 import styles from "./permission-request.module.css";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -73,6 +75,8 @@ export interface PermissionRequestProps {
   onDecisionChange?: (decision: PermissionDecision | null) => void;
   /** The clock for the time left, epoch ms. Without it the card ticks every second while a timed grant runs. */
   now?: number;
+  /** Labels the agent proposed for Allow. Shown when it passes the checks; otherwise "Allow once" and friends. */
+  cta?: CtaProposal;
   className?: string;
 }
 
@@ -104,6 +108,7 @@ export function PermissionRequest({
   defaultDecision = null,
   onDecisionChange,
   now,
+  cta,
   className,
 }: PermissionRequestProps) {
   const id = useId();
@@ -224,10 +229,9 @@ export function PermissionRequest({
                 <Key variant="tertiary" data-action="deny" aria-keyshortcuts="Escape" onClick={deny}>
                   Deny<span className={styles.hint} aria-hidden><Kbd>Esc</Kbd></span>
                 </Key>
-                <Key variant={destructive ? "secondary" : "primary"} className={cx(destructive && styles.danger)} data-action="allow" aria-keyshortcuts="Enter" aria-label={allowLabel} onClick={allow}>
-                  <RollText text={allowLabel} />
-                  <span className={styles.hint} aria-hidden><Kbd className={cx(!destructive && styles.faceKbd)}>↵</Kbd></span>
-                </Key>
+                <CtaKey intent="decide" risk={risk} label={allowLabel} proposal={chosen === "once" ? proposedPrimary(cta, "decide") : undefined}
+                  data-action="allow" aria-keyshortcuts="Enter" onClick={allow}
+                  trailing={<span className={styles.hint} aria-hidden><Kbd className={cx(!destructive && styles.faceKbd)}>↵</Kbd></span>} />
               </div>
             </div>
           </Fold>

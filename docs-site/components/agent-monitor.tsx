@@ -78,7 +78,7 @@ function Demo() {
             until={until}
             pausedFor={pausedFor}
             cost={cost}
-            ask={{ title: "Wants to overwrite the export", action: "Overwrite Projects-demo.mp4 in ~/Movies" }}
+            ask={{ title: "Wants to overwrite the export", action: "Overwrite Projects-demo.mp4 in ~/Movies", tool: "export_overwrite" }}
             outcome="Exported Projects-demo.mp4 · 48 MB"
             error={error}
             folded={folded}

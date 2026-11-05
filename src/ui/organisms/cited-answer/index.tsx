@@ -22,6 +22,8 @@ import { Tray, TrayCard, TrayRow } from "@/ui/molecules/tray";
 import { NotePin } from "@/ui/organisms/agent";
 import { formatTime } from "@/editor/model";
 import { blurIn, motionTokens } from "@/ui/tokens/motion";
+import { CtaKey, answerLabel, proposedPrimary } from "@/ui/cta";
+import type { CtaProposal } from "@/ui/cta";
 import styles from "./cited-answer.module.css";
 
 export type MomentKind = "frame" | "transcript" | "note" | "click";
@@ -73,7 +75,11 @@ export interface CitedAnswerProps {
   /** "Go to 0:12" in the preview. */
   onSeek?: (t: number, moment: Moment) => void;
   /** One action on the tray, e.g. Apply as edits. Disabled while streaming. */
-  action?: { label: string; onClick: () => void };
+  action?: { label?: string; onClick: () => void };
+  /** How many edits the action would make; words it "Apply as 3 edits". */
+  edits?: number;
+  /** Labels the agent proposed for the main key. Shown when they pass the checks; otherwise the derived label. */
+  cta?: CtaProposal;
   className?: string;
 }
 
@@ -106,6 +112,8 @@ export function CitedAnswer({
   onPreviewChange,
   onSeek,
   action,
+  edits,
+  cta,
   className,
 }: CitedAnswerProps) {
   const reduce = useReducedMotion();
@@ -253,7 +261,8 @@ export function CitedAnswer({
             <span className={styles.line} aria-live="polite">
               <Swap id={line}>{streaming ? <Shimmer>{line}</Shimmer> : line}</Swap>
             </span>
-            {action && <Key size="sm" variant="primary" disabled={streaming} onClick={action.onClick}>{action.label}</Key>}
+            {action && <CtaKey size="sm" intent="apply" count={edits} label={action.label ?? answerLabel(edits ?? 1)} proposal={proposedPrimary(cta, "apply")}
+              disabled={streaming} reason="Still answering" onClick={action.onClick} />}
           </>
         }
       >

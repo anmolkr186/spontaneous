@@ -74,6 +74,7 @@ export const entry: DocEntry = {
   source: src,
   sourcePath: "src/ui/organisms/permission-request/index.tsx",
   props: [
+    { name: "cta", type: "CtaProposal", description: "Labels the agent proposed. Shown when they pass the CTA checks; otherwise the label derived from context." },
     { name: "agent", type: "{ name, model?, avatar? } = Claude Code", description: "Who asks. The avatar defaults to the app's mark." },
     { name: "action", type: "string", description: "What it wants to do, read after \"wants to\": \"write to ~/Movies/Spontaneous\"." },
     { name: "target", type: "string", description: "Where, shown under the title with toolIcon." },

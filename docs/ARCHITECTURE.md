@@ -343,6 +343,8 @@ spontaneous/
 
 ## 13. Risks and open questions
 
+Product and design decisions (open, decided, and decided-but-not-built) are tracked in `docs/DECISIONS.md`. This section keeps the technical risks.
+
 - **Native layer under WKWebView.** We need to confirm that resize, Retina scale and live-resize sync are smooth. If not, fall back to a separate child NSWindow or a native canvas view next to the webview. Prototype this first in phase 3.
 - **AGPL references.** Recordly and Cap are reference only. Don't copy code.
 - **Permissions UX on macOS 15+.** Screen Recording consent is re-confirmed periodically, and the onboarding has to handle that gracefully.

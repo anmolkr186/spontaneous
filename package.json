@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc -b --noEmit",
-    "docs:agent-ui": "node scripts/agent-ui-doc.ts"
+    "docs:agent-ui": "node scripts/agent-ui-doc.ts",
+    "test:cta": "node --test scripts/cta.test.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.32",

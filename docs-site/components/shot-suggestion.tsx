@@ -66,6 +66,7 @@ import { shotById } from "@/editor/shots";
   source: src,
   sourcePath: "src/ui/molecules/shot-suggestion/index.tsx",
   props: [
+    { name: "cta", type: "CtaProposal", description: "Labels the agent proposed. Shown when they pass the CTA checks; otherwise the label derived from context." },
     { name: "options", type: "ShotOption[]", description: "{ id, label, reason, confidence: 1 | 2 | 3 }. The first is the suggestion; the rest go under Other options." },
     { name: "context", type: "string", description: "Finishes the sentence \"Use Orbit In …\", e.g. \"for the opening\"." },
     { name: "title", type: "ReactNode = \"Suggested shot\"", description: "Tray title, with the film icon by default." },
