@@ -3,9 +3,8 @@
 #
 # App cleaners match leftovers by name and bundle id, so on a Mac the build
 # tree and the installers live in a folder that matches neither. The .noindex
-# suffix keeps the built Spontaneous.app out of Spotlight. The Cargo setting is
-# machine-local (.cargo/config.toml is gitignored); CI has no such file and
-# builds in ./target.
+# suffix keeps the built Spontaneous.app out of Spotlight. use-external-target.sh
+# sets the Cargo side of this; CI builds in ./target.
 #
 #   npm run package                  build, DMG lands in ~/Builds/sptn.noindex/dmg
 #   npm run package -- --debug       extra arguments go to `tauri build`
@@ -23,12 +22,7 @@ command -v cargo >/dev/null || export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 if [[ -n "${CI:-}" ]]; then
   artifact_dir="${ARTIFACT_DIR:-$root/artifacts}"
 else
-  build_home="$HOME/Builds/sptn.noindex"
-  artifact_dir="${ARTIFACT_DIR:-$build_home/dmg}"
-  if [[ ! -f .cargo/config.toml ]]; then
-    mkdir -p .cargo
-    printf '[build]\ntarget-dir = "%s/target"\n' "$build_home" > .cargo/config.toml
-  fi
+  artifact_dir="${ARTIFACT_DIR:-$HOME/Builds/sptn.noindex/dmg}"
   if [[ -z "${APPLE_SIGNING_IDENTITY:-}" ]]; then
     identities="$(security find-identity -v -p codesigning)"
     identity="$(sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' <<< "$identities" | head -1)"
