@@ -1,0 +1,42 @@
+/* ── CTA key ─────────────────────────────────────────────────────
+   Always the machined key underneath; the light face is a layer that
+   fades in when the key is elected primary, so a key changing rank
+   crossfades its material instead of snapping. Weight stays put so
+   the width never jumps; the label rolls and glides on its own.     */
+.cta.cta.cta {
+  isolation: isolate;
+  background: var(--key-bg);
+  font-weight: var(--weight-medium);
+  transition:
+    color var(--duration-standard) var(--ease-standard),
+    box-shadow var(--duration-standard) var(--ease-standard),
+    transform var(--duration-instant) var(--ease-standard),
+    opacity var(--duration-instant);
+}
+.cta.cta.cta:hover { background: var(--key-bg-hover); }
+.cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--face-bg);
+  opacity: 0;
+  transition: opacity var(--duration-standard) var(--ease-standard);
+}
+.cta[data-role="primary"]::before { opacity: 1; }
+
+/* Destructive and elected: the face turns red, the one place a primary takes a hue. */
+.cta[data-risk="destructive"]::before { background: linear-gradient(180deg, #ff6b61 0%, #ec4c41 100%); }
+.cta.cta.cta[data-risk="destructive"][data-role="primary"] { color: #fff; }
+
+.cta[aria-disabled="true"] { opacity: .4; cursor: default; }
+.cta[aria-disabled="true"]:active { transform: none; }
+
+.label { height: 18px; }
+.kbd { margin-right: calc(var(--space-1) * -1); transition: background-color var(--duration-standard), color var(--duration-standard); }
+.cta[data-role="primary"] .kbd { background: rgb(0 0 0 / .07); box-shadow: inset 0 0 0 .5px rgb(0 0 0 / .12); color: rgb(17 17 19 / .62); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cta::before { transition: none; }
+}

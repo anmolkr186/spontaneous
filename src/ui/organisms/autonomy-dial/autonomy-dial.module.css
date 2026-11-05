@@ -1,0 +1,73 @@
+/* AutonomyDial: a three-stop dial in a well over two groups of actions.
+   The card clips to a measured height that springs to fit, so rows can travel
+   between the groups while the card grows or shrinks around them. */
+
+.dial { --focus-outline-offset: 1px; }
+.clip { overflow: hidden; border-radius: inherit; }
+.body { display: flex; flex-direction: column; padding: var(--space-3) var(--tray-card-inset); }
+
+.header { display: flex; flex-direction: column; gap: 1px; margin-bottom: var(--space-3); }
+.title { margin: 0; color: var(--foreground); font-size: var(--text-base); font-weight: var(--weight-medium); line-height: 18px; }
+.subtitle { margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: 16px; }
+
+/* ── The dial: a well, the chosen stop rises as a key and glides ── */
+.stops {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-0-5);
+  padding: 3px;
+  border-radius: calc(var(--radius-md) + 3px);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+}
+.stop {
+  position: relative;
+  height: var(--control-height-md);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-standard), scale var(--duration-instant) var(--ease-standard);
+}
+.stop:hover { color: var(--text-secondary); }
+.stop:active { scale: .98; }
+.stop[aria-checked="true"] { color: var(--foreground); }
+.stopKey { position: absolute; inset: 0; border-radius: inherit; background: var(--key-bg-on); box-shadow: var(--key-shadow); }
+.stopText { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1-5); }
+.gauge { display: inline-flex; gap: 1.5px; opacity: .45; transition: opacity var(--duration-fast) var(--ease-standard); }
+.stop[aria-checked="true"] .gauge { opacity: 1; }
+
+.means { position: relative; min-height: 18px; margin: var(--space-2) 0 var(--space-3); color: var(--text-secondary); font-size: var(--text-sm); line-height: 18px; }
+
+/* ── Groups ──────────────────────────────────────────────────── */
+.group + .group { margin-top: var(--space-2); padding-top: var(--space-2); box-shadow: inset 0 1px 0 var(--border-subtle); }
+.groupHead { display: flex; align-items: center; gap: var(--space-1-5); height: 24px; margin: 0; color: var(--text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+.count { color: var(--text-secondary); }
+.list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+.action { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); min-height: 36px; padding: var(--space-0-5) 0 var(--space-0-5) var(--space-0-5); }
+.icon { display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-sm); background: var(--key-bg); box-shadow: var(--key-shadow); color: var(--text-secondary); }
+.icon svg { width: 13px; height: 13px; stroke-width: 1.9; }
+.text { display: flex; flex-direction: column; min-width: 0; }
+.label, .detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.label { color: var(--foreground); font-size: var(--text-base); line-height: 18px; }
+.detail { color: var(--text-muted); font-size: var(--text-xs); line-height: 15px; }
+
+/* The lock shows on the row you point at or tab into, and stays while it's set. */
+.lock { opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard), box-shadow var(--duration-instant) var(--ease-standard); }
+.action:hover .lock, .lock:focus-visible, .lock[aria-pressed="true"] { opacity: 1; }
+.lock svg { width: 13px; height: 13px; }
+@media (hover: none) { .lock { opacity: 1; } .action { min-height: 44px; } }
+
+.empty { display: flex; align-items: center; min-height: 36px; padding-left: var(--space-1); color: var(--text-faint); font-size: var(--text-sm); animation: rise var(--reveal-duration) var(--ease-reveal) both; }
+
+@container (max-width: 340px) {
+  .detail, .gauge { display: none; }
+  .stop { padding: 0 var(--space-1); }
+}
+
+@keyframes rise { from { opacity: 0; translate: 0 3px; filter: blur(var(--blur-soft)); } }

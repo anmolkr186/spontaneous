@@ -13,10 +13,24 @@
 .item { display: flex; align-items: center; width: 100%; height: var(--control-height-md); padding: 0 var(--space-2-5); border: 0; border-radius: var(--radius-md); background: none; color: var(--text-secondary); font-size: var(--text-sm); text-align: left; }
 .item:hover { background: var(--hover); color: var(--foreground); }
 .item[aria-current="page"] { background: var(--key-bg-on); box-shadow: var(--key-shadow); color: var(--foreground); }
+.itemName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itemNew { flex: none; color: var(--text-muted); font-size: var(--text-2xs); font-weight: var(--weight-medium); }
+
+/* Components dropdown: one disclosure holding every category. */
+.dropdown { display: flex; align-items: center; gap: var(--space-1-5); width: 100%; height: var(--control-height-md); padding: 0 var(--space-2-5) 0 var(--space-1-5); border: 0; border-radius: var(--radius-md); background: none; color: var(--foreground); font-size: var(--text-sm); font-weight: var(--weight-medium); text-align: left; }
+.dropdown:hover { background: var(--hover); }
+.dropdownChevron { width: 13px; height: 13px; color: var(--text-muted); stroke-width: 2; transition: rotate var(--duration-standard) var(--ease-standard); }
+.dropdown[aria-expanded="true"] .dropdownChevron { rotate: 90deg; }
+.dropdownCount { margin-left: auto; color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.dropdownBody { position: relative; margin: var(--space-1) 0 0 var(--space-3); padding-left: var(--space-1-5); box-shadow: inset 1px 0 0 var(--border-subtle); }
+.category + .category { margin-top: var(--space-3); }
+.categoryTitle { margin: var(--space-1-5) 0 var(--space-1); padding: 0 var(--space-2-5); color: var(--text-faint); font-size: var(--text-2xs); font-weight: var(--weight-medium); }
 
 .main { overflow-y: auto; scrollbar-width: thin; }
 .article { max-width: 860px; margin: 0 auto; padding: var(--space-10) var(--space-10) var(--space-16); user-select: text; }
-.crumb { display: flex; gap: var(--space-2); color: var(--text-muted); font-size: var(--text-sm); }
+.crumb { display: flex; align-items: center; gap: var(--space-1-5); color: var(--text-muted); font-size: var(--text-sm); }
+.crumb svg { width: 12px; height: 12px; color: var(--text-faint); }
+.crumb span:last-child { color: var(--text-secondary); }
 .title { margin: var(--space-3) 0 var(--space-2); color: var(--foreground); font-size: var(--text-3xl); font-weight: var(--weight-strong); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); }
 .lede { max-width: 620px; margin: 0 0 var(--space-8); color: var(--text-secondary); font-size: var(--text-lg); line-height: var(--leading-body); }
 .h2 { margin: var(--space-10) 0 var(--space-3); color: var(--foreground); font-size: var(--text-xl); font-weight: var(--weight-strong); letter-spacing: -.015em; }
@@ -25,7 +39,10 @@
 .ul { margin: 0 0 var(--space-3); padding-left: var(--space-5); color: var(--text-secondary); font-size: var(--text-md); line-height: 1.7; }
 .ul b { color: var(--foreground); font-weight: var(--weight-medium); }
 
-.tabs { margin-bottom: var(--space-2-5); }
+.tabs { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2-5); }
+.tabsMeta { display: flex; align-items: center; gap: var(--space-2); }
+.keys { display: inline-flex; gap: 3px; }
+.keys kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: var(--radius-xs); background: var(--key-bg); box-shadow: var(--key-shadow); color: var(--text-secondary); font: var(--weight-medium) var(--text-2xs) var(--font-body); }
 .preview { position: relative; display: grid; place-items: center; min-height: 280px; padding: var(--space-10); overflow: hidden; border-radius: var(--radius-2xl); background: var(--stage); box-shadow: var(--card-shadow); }
 .preview[data-flush] { place-items: stretch; padding: 0; }
 .code { max-height: 520px; margin: 0; padding: var(--space-4) var(--space-5); overflow: auto; border-radius: var(--radius-xl); background: var(--well-bg); box-shadow: var(--well-shadow); color: var(--g-200); font: 12px/1.6 var(--font-mono); tab-size: 2; }
@@ -75,3 +92,18 @@
 .stateStage { display: grid; place-items: center; min-height: 110px; padding: var(--space-5); background: var(--stage); }
 .state figcaption { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2-5) var(--space-3); color: var(--text-muted); font-size: var(--text-xs); }
 .state figcaption b { color: var(--foreground); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.lede:has(+ .codeName) { margin-bottom: var(--space-3); }
+.codeName { margin: 0 0 var(--space-6); color: var(--text-muted); font-size: var(--text-sm); }
+.codeName code { padding: 1px 5px; border-radius: var(--radius-xs); background: var(--surface-muted); color: var(--g-200); font: var(--weight-medium) .9em var(--font-mono); }
+
+/* In the stream */
+.h3 { margin: var(--space-6) 0 var(--space-2-5); color: var(--foreground); font-size: var(--text-md); font-weight: var(--weight-strong); }
+.trigger { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1-5); color: var(--text-secondary); }
+.exchange { display: flex; flex-direction: column; gap: var(--space-3); max-width: 420px; margin-bottom: var(--space-4); padding: var(--space-4); border-radius: 16px; background: var(--surface); box-shadow: var(--card-shadow); }
+.exchangeText { margin: 0; color: var(--foreground); font-size: var(--text-base); line-height: 1.55; }
+.exchangeNote { margin: 0; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.5; }
+.surfaces { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.surface { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-4); border: 0; border-radius: var(--radius-xl); background: var(--surface); box-shadow: var(--card-shadow); color: var(--text-muted); font-size: var(--text-sm); line-height: 1.5; text-align: left; transition: box-shadow var(--duration-fast) var(--ease-standard); }
+.surface:hover { box-shadow: var(--card-shadow-hover); }
+.surface b { color: var(--foreground); font-size: var(--text-base); font-weight: var(--weight-medium); }
+.surface q { color: var(--text-secondary); font-style: normal; }

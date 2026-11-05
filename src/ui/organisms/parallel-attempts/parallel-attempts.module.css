@@ -1,0 +1,106 @@
+/* ── Parallel attempts ─────────────────────────────────────────
+   One fixed-height row per attempt: name and score, a line that
+   turns from what it's doing into the outcome, and a bar in a well.
+   The pick is a wash of light that glides between rows.            */
+.heading { flex: none; }
+.task { min-width: 0; overflow: hidden; color: var(--text-secondary); text-overflow: ellipsis; }
+.task::before { content: "·"; margin-right: var(--space-1-5); color: var(--text-faint); }
+
+.list { display: flex; flex-direction: column; padding: var(--space-1); }
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 18px 16px 4px;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  padding: var(--space-2-5) var(--space-2-5) var(--space-3) var(--space-1-5);
+  border-radius: var(--radius-md);
+  transition: opacity var(--duration-standard) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+  animation: rowIn var(--duration-considered) var(--ease-standard) backwards;
+  animation-delay: calc(var(--i) * var(--stagger));
+}
+.row > :not(.wash) { position: relative; }
+.row[data-status="done"]:hover:not([data-picked]) { background: var(--hover); }
+@keyframes rowIn { from { opacity: 0; translate: 0 6px; filter: blur(var(--blur-soft)); } }
+
+/* The ones you didn't pick step back; pointing at one brings it forward. */
+.list[data-picked] .row:not([data-picked]) { opacity: .55; }
+.list[data-picked] .row:not([data-picked]):is(:hover, :focus-within) { opacity: 1; }
+
+.wash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(255 255 255 / .05);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .06), inset 0 1px 0 rgb(255 255 255 / .04);
+  pointer-events: none;
+}
+
+/* ── Top line: approach, model, Best, score ──────────────────── */
+.name { display: flex; align-items: baseline; gap: var(--space-1-5); min-width: 0; overflow: hidden; color: var(--foreground); font-size: var(--text-base); font-weight: var(--weight-medium); line-height: 18px; white-space: nowrap; }
+.model { overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); font-weight: var(--weight-regular); text-overflow: ellipsis; }
+.score { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--space-1-5); }
+.scoreValue { min-width: 2ch; color: var(--foreground); font-size: var(--text-base); font-weight: var(--weight-strong); text-align: right; }
+
+/* ── Second line: what it's doing, then the outcome ──────────── */
+.line { min-width: 0; height: 16px; overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); line-height: 16px; mask-image: linear-gradient(to left, transparent, #000 16px); }
+.line[data-failed] { color: var(--danger); }
+.row[data-status="queued"] .line { color: var(--text-muted); }
+
+/* Duration and "Use this one" share one slot, so the row never grows. */
+.slot { display: grid; align-items: center; justify-items: end; }
+.slot > * { grid-area: 1 / 1; }
+.took { transition: opacity var(--duration-fast) var(--ease-standard); }
+.use { margin: -4px calc(-1 * var(--space-1-5)) -4px 0; opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); }
+.use svg { width: 13px; height: 13px; }
+.row:is(:hover, :focus-within) .use, .row[data-picked] .use { opacity: 1; }
+.row[data-status="done"]:is(:hover, :focus-within) .took, .row[data-picked] .took { opacity: 0; }
+.row[data-picked] .use { color: var(--foreground); }
+
+/* ── Bar ─────────────────────────────────────────────────────────
+   The fill slides in from the left (a transform, never a width).
+   Running, its leading edge is soft and a sheen passes over it.    */
+.track {
+  position: relative;
+  grid-column: 1 / -1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--well-bg);
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / .35);
+}
+.fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--g-300);
+  translate: calc((var(--p) - 1) * 100%) 0;
+  transition: translate 640ms var(--ease-standard), background-color var(--duration-standard) var(--ease-standard);
+}
+.row[data-status="running"] .fill { background: linear-gradient(90deg, var(--live) calc(100% - 16px), transparent); }
+.row[data-status="running"] .fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 35%, var(--live-sheen) 50%, transparent 65%) 0 0 / 250% 100%;
+  opacity: .6;
+  animation: sheen var(--duration-sweep) linear infinite;
+}
+.row[data-status="failed"] .fill { background: var(--danger); }
+.row[data-picked] .fill { background: var(--g-100); }
+@keyframes sheen { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+
+.foot { display: inline-flex; min-width: 0; color: var(--text-secondary); }
+
+@media (hover: none) {
+  .use { opacity: 1; }
+  .row[data-status="done"] .took { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row { animation: none; }
+  .row[data-status="running"] .fill::after { animation: none; opacity: 0; }
+}

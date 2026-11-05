@@ -1,0 +1,79 @@
+/* ContextWindow: a total, a field of skewed cells, and one row per part.
+   Parts are graphite levels (your notes take the ink); empty cells are a faint
+   groove. Cells change color one after another from the first cell that
+   changed, so any change sweeps through the field left to right. */
+
+.context { --focus-outline-offset: 1px; }
+.body { display: flex; flex-direction: column; padding: var(--space-3) var(--tray-card-inset); }
+
+/* ── Total ───────────────────────────────────────────────────── */
+.total { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-3); }
+.big { display: inline-flex; align-items: baseline; gap: var(--space-1-5); min-width: 0; }
+.bigNumber { color: var(--foreground); font-size: var(--text-2xl); font-weight: var(--weight-strong); letter-spacing: var(--tracking-display); line-height: 1.1; }
+.of { color: var(--text-muted); font-size: var(--text-sm); }
+.share { display: inline-flex; align-items: center; gap: var(--space-1-5); padding-bottom: 2px; color: var(--text-muted); font-size: var(--text-sm); }
+.shareLabel { display: inline-flex; }
+.pct { color: var(--text-secondary); transition: color var(--duration-standard) var(--ease-standard); }
+.share[data-warn] .pct { color: var(--foreground); }
+.warnTag { display: inline-flex; }
+
+/* ── Field ───────────────────────────────────────────────────── */
+.field { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 2px; margin: var(--space-3) 0 var(--space-2-5); padding: 0 1px; }
+.field > .cell {
+  width: auto;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 1.5px;
+  background-color: var(--tone, var(--border));
+  transition:
+    background-color 260ms var(--ease-standard) calc(var(--d, 0) * 2.5ms),
+    opacity var(--duration-fast) var(--ease-standard);
+}
+.field[data-pointing] > .cell:not([data-on]) { opacity: .22; }
+/* Compacting: the part's cells breathe in a wave that runs across the columns. */
+.field > .cell[data-wave] { animation: wave 1.2s var(--ease-in-out) calc(var(--col, 0) * 28ms) infinite; }
+@keyframes wave { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+/* ── Parts ───────────────────────────────────────────────────── */
+.parts { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.part { transition: opacity var(--duration-fast) var(--ease-standard); }
+.part[data-dim] { opacity: .45; }
+.partRow { display: flex; align-items: center; gap: var(--space-2); height: 28px; font-size: var(--text-sm); }
+.partName { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; height: 24px; margin-left: calc(var(--space-1) * -1); padding: 0 var(--space-1-5) 0 var(--space-1); border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-secondary); font-size: var(--text-sm); white-space: nowrap; }
+button.partName { transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-instant) var(--ease-standard), scale var(--duration-instant) var(--ease-standard); }
+button.partName:hover { background: var(--hover); color: var(--foreground); }
+button.partName:active { scale: .98; }
+.partLabel { overflow: hidden; text-overflow: ellipsis; }
+.part .legend { background: var(--tone); }
+.itemCount { color: var(--text-muted); font-size: var(--text-xs); }
+.chevron { width: 12px; height: 12px; color: var(--text-muted); stroke-width: 2; transition: rotate var(--duration-standard) var(--ease-standard); }
+.partName[aria-expanded="true"] .chevron { rotate: 90deg; }
+.locked { display: inline-grid; place-items: center; color: var(--text-faint); }
+.locked svg { width: 11px; height: 11px; stroke-width: 2; }
+.partTokens { min-width: 44px; color: var(--text-secondary); text-align: right; }
+.partTokens > * { justify-content: flex-end; }
+
+.compactSlot { display: inline-flex; }
+.compact svg { width: 13px; height: 13px; }
+.compactIcon { display: inline-grid; place-items: center; width: 13px; height: 13px; }
+.compact[data-state="busy"] { color: var(--foreground); cursor: progress; }
+.compact[data-state="done"] { color: var(--text-secondary); }
+.done { color: var(--success); }
+
+/* Items fold open under their part, indented to the label. */
+.items { margin: 0 0 var(--space-1); padding: 0 0 0 15px; list-style: none; }
+.item { overflow: hidden; }
+.itemRow { display: flex; align-items: center; gap: var(--space-2); height: 26px; font-size: var(--text-sm); }
+.itemLabel { display: inline-flex; flex: 1; align-items: baseline; gap: var(--space-1); min-width: 0; overflow: hidden; color: var(--text-secondary); white-space: nowrap; }
+.itemTime { color: var(--text-muted); font-size: var(--text-xs); }
+.itemTokens { color: var(--text-muted); font-size: var(--text-xs); }
+.item .remove { --h: 20px; }
+.item .remove svg { width: 12px; height: 12px; }
+
+/* ── Tray foot ───────────────────────────────────────────────── */
+.status { display: inline-flex; align-items: center; gap: var(--space-1-5); min-width: 0; }
+.context[data-warn] .status { color: var(--foreground); }
+
+@media (prefers-reduced-motion: reduce) {
+  .field > .cell[data-wave] { animation: none; opacity: .55; }
+}

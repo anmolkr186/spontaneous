@@ -1,0 +1,126 @@
+/* ── Bar ─────────────────────────────────────────────────────────
+   Tertiary keys: no material until hovered. A pressed vote or a
+   playing preview stays quiet too; only its icon changes.         */
+.root { display: flex; flex-direction: column; min-width: 0; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-height: var(--control-height-sm); margin-left: calc(var(--space-1) * -1); }
+.action { color: var(--text-muted); }
+.bar .action svg { width: 14px; height: 14px; stroke-width: 1.85; }
+.bar .action[aria-pressed="true"][data-variant] { background: transparent; box-shadow: none; color: var(--foreground); }
+.bar .action[aria-pressed="true"][data-variant]:hover { background: var(--hover); }
+.action:active > * { scale: .9; }
+.action > * { transition: scale var(--duration-instant) var(--ease-standard); }
+
+/* Two faces in one slot: one blurs away while the other comes in. */
+.morph { position: relative; display: grid; place-items: center; width: 14px; height: 14px; }
+.layer { grid-area: 1 / 1; display: grid; place-items: center; opacity: 0; scale: .6; filter: blur(var(--blur-soft)); transition: opacity 200ms ease, scale 300ms var(--ease-standard), filter 200ms ease; }
+.layer[data-on] { opacity: 1; scale: 1; filter: none; }
+.check svg { overflow: visible; fill: none; stroke: var(--foreground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.check path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 120ms ease-in; }
+.check[data-on] path { stroke-dashoffset: 0; transition: stroke-dashoffset var(--duration-draw) var(--ease-standard) 60ms; }
+
+/* Regenerate: one turn per press, a steady turn while writing. */
+.regen { display: inline-flex; flex: none; align-items: center; }
+.spin { display: grid; place-items: center; }
+.spin[data-spin] { animation: turn 640ms var(--ease-standard); }
+.action[data-busy] .spin { animation: turn 900ms linear infinite; }
+.action[data-busy] { color: var(--foreground); }
+@keyframes turn { from { rotate: 0deg; } to { rotate: 360deg; } }
+
+/* The version switcher unfolds sideways from Regenerate. */
+.versions { display: grid; grid-template-columns: 0fr; opacity: 0; transition: grid-template-columns var(--duration-fold) var(--ease-glide), opacity 220ms ease; }
+.versions[data-open] { grid-template-columns: 1fr; opacity: 1; transition: grid-template-columns var(--duration-fold) var(--ease-glide), opacity 320ms ease 80ms; }
+.versionsClip { display: flex; align-items: center; min-width: 0; overflow: hidden; }
+.step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: var(--control-height-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  transition: background-color var(--duration-instant) var(--ease-standard), color var(--duration-instant) var(--ease-standard), opacity var(--duration-fast) ease;
+}
+.step:hover { background: var(--hover); color: var(--foreground); }
+.step:active svg { scale: .88; }
+.step:disabled { opacity: .35; pointer-events: none; }
+.step svg { width: 13px; height: 13px; stroke-width: 2; transition: scale var(--duration-instant) var(--ease-standard); }
+.count { display: inline-flex; align-items: center; gap: 2px; padding: 0 2px; color: var(--text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); white-space: nowrap; }
+.countNow { color: var(--text-secondary); }
+
+/* Thumbs: a vote fills the hand with one small pop. */
+.votes { display: inline-flex; align-items: center; gap: 2px; }
+.thumb { display: grid; place-items: center; }
+.thumb svg { fill: transparent; transition: fill 200ms ease; }
+.vote[aria-pressed="true"] .thumb svg { fill: currentColor; }
+.vote[aria-pressed="true"] .thumb { animation: vote 420ms var(--ease-pop); }
+@keyframes vote { 40% { scale: 1.24; rotate: -8deg; } }
+
+/* Preview: the play glyph gives way to four level bars. */
+.levels .meter { height: 12px; }
+.levels:not([data-on]) .meter i { animation-play-state: paused; }
+
+/* ── Feedback row ────────────────────────────────────────────── */
+.panel { max-width: 400px; padding-top: var(--space-1-5); }
+.panelSwap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2-5) var(--space-2-5) var(--space-3);
+  border-radius: var(--radius-tray-card);
+  background: var(--tray-card-bg);
+  box-shadow: var(--tray-card-shadow);
+}
+.panelHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-right: calc(var(--space-1) * -1); }
+.panelTitle { color: var(--foreground); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.reasons { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+/* Reasons sit in the well; the picked one rises as a key. */
+.reason {
+  height: var(--control-height-sm);
+  padding: 0 var(--space-2-5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition: background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), scale var(--duration-instant) var(--ease-standard);
+}
+.reason:hover { color: var(--foreground); }
+.reason:active { scale: .97; }
+.reason[aria-pressed="true"] { background: var(--key-bg-on); box-shadow: var(--key-shadow); color: var(--foreground); }
+.field {
+  display: block;
+  width: 100%;
+  height: var(--control-height-md);
+  margin-top: var(--space-0-5);
+  padding: 0 var(--space-2-5);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.field::placeholder { color: var(--text-muted); }
+.panelFoot { display: flex; justify-content: flex-end; }
+.thanks { display: flex; align-items: center; gap: var(--space-2); margin: 0; min-height: var(--control-height-sm); color: var(--text-secondary); font-size: var(--text-sm); }
+.thanksCheck { color: var(--success); }
+
+/* ── MessageText: crossfade with a height glide ─────────────── */
+.text { position: relative; }
+.text[data-measured] { height: var(--h); overflow: hidden; transition: height var(--duration-fold) var(--ease-glide); }
+.textInner { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin[data-spin], .vote[aria-pressed="true"] .thumb { animation: none; }
+  .action[data-busy] .spin { animation: none; }
+  .meter i { animation: none; height: 60%; }
+  .meter i:nth-child(even) { height: 90%; }
+  .text[data-measured] { transition: none; }
+}

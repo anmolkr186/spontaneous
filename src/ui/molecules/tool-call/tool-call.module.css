@@ -1,0 +1,186 @@
+/* ── ToolCall ────────────────────────────────────────────────────
+   A raised card per call. The header is one line; the body folds
+   open to a well of labelled rows, the way data sits in an inset.  */
+.call {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--radius-tray-card);
+  background: var(--tray-card-bg);
+  box-shadow: var(--tray-card-shadow);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-1-5) var(--space-2-5) var(--space-1-5) var(--space-1-5);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  text-align: left;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.call[data-open] > .head { border-radius: var(--radius-tray-card) var(--radius-tray-card) 0 0; }
+.head:hover { background: var(--hover); }
+.head:active .tile { scale: .94; }
+
+.tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--key-bg);
+  box-shadow: var(--key-shadow);
+  color: var(--text-secondary);
+  transition: color var(--duration-standard) var(--ease-standard), scale var(--duration-instant) var(--ease-standard);
+}
+.tile svg { width: 13px; height: 13px; stroke-width: 1.9; }
+.call[data-status="done"] .tile { color: var(--foreground); }
+
+.main { display: flex; flex: 1; align-items: center; gap: var(--space-2); min-width: 0; overflow: hidden; }
+.title { flex: none; height: 18px; line-height: 18px; color: var(--foreground); font-weight: var(--weight-medium); }
+.call[data-status="running"] .title { color: var(--text-secondary); }
+.summary { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--text-muted); line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Positions in the recording: the time face. */
+.time { font-family: var(--font-mono); font-size: .92em; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.span { margin-left: var(--space-1-5); color: var(--text-muted); font-family: var(--font-mono); font-size: .92em; letter-spacing: 0; }
+
+.status { display: inline-flex; flex: none; align-items: center; gap: var(--space-1-5); color: var(--text-muted); font-size: var(--text-xs); white-space: nowrap; }
+.failed { color: var(--danger); font-weight: var(--weight-medium); }
+
+.chevron { flex: none; width: 14px; height: 14px; color: var(--text-faint); stroke-width: 1.9; transition: rotate var(--duration-fold) var(--ease-glide), color var(--duration-fast) var(--ease-standard); }
+.head:hover .chevron, .groupHead:hover .chevron { color: var(--text-muted); }
+.call[data-open] > .head .chevron, .group[data-open] > .groupHead .chevron { rotate: 180deg; }
+
+/* ── Body ────────────────────────────────────────────────────── */
+.body { padding: 0 var(--tray-pad) var(--tray-pad); }
+.well {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+}
+.section { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.sectionHead { display: flex; align-items: center; justify-content: space-between; height: var(--control-height-sm); margin-right: calc(var(--space-1-5) * -1); }
+.sectionLabel { color: var(--text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+
+.rows { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; }
+.row { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: baseline; gap: var(--space-3); font-size: var(--text-sm); line-height: 1.45; }
+.row dt { color: var(--text-muted); }
+.row dd { margin: 0; color: var(--foreground); overflow-wrap: anywhere; }
+/* Rows arrive a beat after each other each time the card opens. */
+.call[data-open] .row { animation: rowIn 320ms var(--ease-standard) both; animation-delay: calc(80ms + var(--i, 0) * var(--stagger)); }
+@keyframes rowIn { from { opacity: 0; translate: 0 3px; filter: blur(var(--blur-soft)); } }
+
+.plain { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; user-select: text; }
+.waiting { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+
+.more {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  margin: var(--space-0-5) 0 0 calc(var(--space-1-5) * -1);
+  padding: 0 var(--space-1-5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  transition: background-color var(--duration-instant) var(--ease-standard), color var(--duration-instant) var(--ease-standard), scale var(--duration-instant) var(--ease-standard);
+}
+.more:hover { background: var(--hover); color: var(--foreground); }
+.more:active { scale: .97; }
+
+/* Failure: a cross, the message in words, and Retry. */
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-1) calc(var(--space-1-5) * -1) 0;
+  padding: var(--space-1-5) var(--space-1-5) var(--space-1-5) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+}
+.errorIcon { flex: none; width: 14px; height: 14px; margin-top: 3px; color: var(--danger); stroke-width: 1.9; }
+.errorText { flex: 1; min-width: 0; margin: 2px 0; color: var(--foreground); font-size: var(--text-sm); line-height: 1.45; overflow-wrap: anywhere; user-select: text; }
+.retry { flex: none; }
+.retry:active svg { rotate: -60deg; }
+.retry svg { transition: rotate var(--duration-standard) var(--ease-standard); }
+
+/* Copy: the sheets blur away while a check grows in and draws itself. */
+.morph { position: relative; display: grid; place-items: center; width: 14px; height: 14px; }
+.copy .morph svg { grid-area: 1 / 1; width: 14px; height: 14px; transition: opacity 200ms ease, scale 300ms var(--ease-standard), filter 200ms ease; }
+.copy .check { opacity: 0; scale: .6; filter: blur(var(--blur-soft)); overflow: visible; fill: none; stroke: var(--foreground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.check path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 120ms ease-in; }
+.copy[data-copied] .copyGlyph { opacity: 0; scale: .6; filter: blur(var(--blur-soft)); }
+.copy[data-copied] .check { opacity: 1; scale: 1; filter: none; }
+.copy[data-copied] .check path { stroke-dashoffset: 0; transition: stroke-dashoffset var(--duration-draw) var(--ease-standard) 60ms; }
+
+/* ── Group ───────────────────────────────────────────────────────
+   One quiet line in the tray's voice; the cards fold out below it. */
+.group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: var(--tray-pad);
+  border-radius: var(--radius-tray);
+  background: var(--tray-bg);
+  box-shadow: var(--tray-shadow);
+}
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tray-row);
+  padding: 0 var(--space-2) 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-tray-card);
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.groupHead:hover { background: var(--hover); color: var(--foreground); }
+
+.stack { position: relative; display: inline-flex; flex: none; align-items: center; min-width: 20px; }
+.stackTile {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--key-bg);
+  box-shadow: var(--key-shadow), 0 0 0 1.5px var(--g-900);
+  color: var(--text-secondary);
+}
+.stackTile + .stackTile { margin-left: -6px; }
+.stackTile svg { width: 11px; height: 11px; stroke-width: 2; }
+
+.groupLine { display: flex; flex: 1; align-items: center; gap: var(--space-1-5); min-width: 0; white-space: nowrap; }
+.groupLine > * + *::before { content: "·"; margin-right: var(--space-1-5); color: var(--text-faint); font-family: var(--font-body); }
+.groupTitle { height: 16px; line-height: 16px; }
+.groupFailed { color: var(--danger); }
+
+.list { display: flex; flex-direction: column; gap: var(--tray-pad); margin: 0; padding: var(--tray-pad) 0 0; list-style: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .call[data-open] .row { animation: none; }
+  .copy .morph svg, .check path { transition: none; }
+}

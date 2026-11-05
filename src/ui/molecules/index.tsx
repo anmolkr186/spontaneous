@@ -1,16 +1,17 @@
-import { useEffect, useId, useState } from "react";
-import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
-import { motion } from "motion/react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties, HTMLAttributes, KeyboardEvent, PointerEvent, ReactNode } from "react";
+import { animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from "motion/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronDown, Clock3, Mic, Pause, X } from "lucide-react";
-import { Key, Tag } from "@/ui/atoms";
+import { Key, RollNumber, Tag } from "@/ui/atoms";
 import { Tooltip } from "@/ui/base/tooltip/tooltip";
 import type { Note } from "@/editor/model";
 import { formatTime } from "@/editor/model";
+import { motionTokens } from "@/ui/tokens/motion";
+import { CtaKey, noteActionLabel } from "@/ui/cta";
 import styles from "./molecules.module.css";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
-const keySpring = { type: "spring", visualDuration: 0.32, bounce: 0 } as const;
 
 /* ───────────────────────── Layout ───────────────────────── */
 
@@ -50,22 +51,317 @@ export function Hint({ children }: { children: ReactNode }) {
 
 /* ───────────────────────── Switcher ───────────────────────── */
 
-export interface SwitcherOption<T extends string> { value: T; label: string; count?: number }
+export interface SwitcherOption<T extends string> {
+  value: T;
+  /** The words on the option. Leave out for an icon-only option and give it an `ariaLabel`. */
+  label?: string;
+  /** A lucide icon before the label. */
+  icon?: ReactNode;
+  /** Open items, in ink ("Notes 2"). Zero shows nothing; a new count blurs in and its digits roll. */
+  count?: number;
+  /** A short neutral tag after the label ("Beta"). Words, never a hue. */
+  badge?: string;
+  /** Can't be picked: arrow keys skip it and the key never lands on it. */
+  disabled?: boolean;
+  /** Accessible name for an icon-only option. */
+  ariaLabel?: string;
+  /** With kind="tabs": the id of the panel this tab shows. */
+  controls?: string;
+}
+
+export interface SwitcherProps<T extends string> {
+  options: SwitcherOption<T>[];
+  /** The chosen option. Leave out and the switcher holds its own value. */
+  value?: T;
+  /** Starting value when uncontrolled. Defaults to the first enabled option. */
+  defaultValue?: T;
+  /** Called with the new value on click, on arrow keys, and while the key is dragged across options. */
+  onChange?: (value: T) => void;
+  /** Names the group for assistive tech ("Editor mode"). */
+  label: string;
+  /** Stretch to the container with equal options. */
+  full?: boolean;
+  /** 24, 30 or 34px tall. Default md. */
+  size?: "sm" | "md" | "lg";
+  /** A radiogroup for modes and enums, or a tablist that switches panels (give each option `controls`). */
+  kind?: "radio" | "tabs";
+  /** Turns the whole switcher off. */
+  disabled?: boolean;
+  className?: string;
+}
+
+type Press = { id: number; x: number; touch: boolean; drag: boolean; moved: boolean; grab: number; over: number };
+
+/** The key's edges travel separately: the one facing the target leads and the other trails, so it stretches a little and settles. */
+const LEAD = { duration: 0.27, ease: motionTokens.ease.standard };
+const TRAIL = { duration: 0.4, ease: motionTokens.ease.standard };
+/** While dragged, the key follows the pointer a touch behind, so picking it up never jumps. */
+const FOLLOW = { type: "spring", stiffness: 900, damping: 60 } as const;
 
 /**
- * Mutually exclusive options in a well; the chosen one rises as a key and the
- * key slides between options. Used for modes, tabs and small enums.
+ * Mutually exclusive options in a well; the chosen one rises as a key. The key
+ * glides to a new pick with its leading edge running ahead, gives a little
+ * when pressed, and can be dragged across the options, picking as it goes; on
+ * release it snaps into place. Options are as wide as their content, so a
+ * label or count that changes makes the option (and the well) glide to its new
+ * width, and the key follows. Used for modes, panels, inspector tabs and small enums.
  */
-export function Switcher<T extends string>({ options, value, onChange, label, full }: { options: SwitcherOption<T>[]; value: T; onChange: (v: T) => void; label: string; full?: boolean }) {
-  const id = useId();
+export function Switcher<T extends string>({ options, value, defaultValue, onChange, label, full, size = "md", kind = "radio", disabled, className }: SwitcherProps<T>) {
+  const reduced = useReducedMotion();
+  const [own, setOwn] = useState<T | undefined>(() => defaultValue ?? options.find((o) => !o.disabled)?.value);
+  const current = value !== undefined ? value : own;
+  const active = options.findIndex((o) => o.value === current);
+  const tabbable = active >= 0 ? active : options.findIndex((o) => !o.disabled);
+  const tabs = kind === "tabs";
+
+  const root = useRef<HTMLDivElement>(null);
+  const opts = useRef<(HTMLButtonElement | null)[]>([]);
+  opts.current.length = options.length;
+  // The rendered pick, for handlers that outlive a render. A parent that refuses a pick puts the key back.
+  const latest = useRef(current);
+  latest.current = current;
+  const [placed, setPlaced] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const press = useRef<Press | null>(null);
+  const dragging = useRef(false);
+
+  // The key is two edges. While dragged it is a center and a span instead.
+  const left = useMotionValue(0);
+  const right = useMotionValue(0);
+  const width = useTransform([left, right], ([l, r]: number[]) => r! - l!);
+  const center = useMotionValue(0);
+  const span = useMotionValue(0);
+  const aim = useRef({ l: 0, r: 0 });
+  const glideEnds = useRef(0);
+  const shown = useRef<T | undefined>(undefined);
+
+  const select = (v: T) => {
+    const o = options.find((x) => x.value === v);
+    if (!o || o.disabled || disabled || v === latest.current) return;
+    if (value === undefined) setOwn(v);
+    onChange?.(v);
+  };
+
+  /** Where the key belongs: the chosen option's box inside the well. */
+  const target = () => {
+    const b = opts.current[options.findIndex((o) => o.value === latest.current)];
+    return b && b.offsetWidth ? { l: b.offsetLeft, r: b.offsetLeft + b.offsetWidth } : null;
+  };
+
+  /** jump: no motion. glide: a new pick. retarget: the pick's box moved mid-glide. snap: dropped after a drag. */
+  const place = (how: "jump" | "glide" | "retarget" | "snap") => {
+    const t = target();
+    if (!t) return;
+    const moved = Math.abs(t.l - aim.current.l) > 0.5 || Math.abs(t.r - aim.current.r) > 0.5;
+    aim.current = t;
+    if (how === "jump" || reduced) { left.jump(t.l); right.jump(t.r); setPlaced(true); return; }
+    if (how === "snap") {
+      glideEnds.current = performance.now() + motionTokens.spring.snappy.visualDuration * 1000;
+      animate(left, t.l, motionTokens.spring.snappy);
+      animate(right, t.r, motionTokens.spring.snappy);
+      return;
+    }
+    if (how === "retarget") {
+      if (!moved) return;
+      const rest = { duration: Math.max((glideEnds.current - performance.now()) / 1000, 0.12), ease: motionTokens.ease.standard };
+      animate(left, t.l, rest);
+      animate(right, t.r, rest);
+      return;
+    }
+    const toRight = t.l > left.get();
+    glideEnds.current = performance.now() + TRAIL.duration * 1000;
+    animate(left, t.l, toRight ? TRAIL : LEAD);
+    animate(right, t.r, toRight ? LEAD : TRAIL);
+  };
+
+  /** Options take their content's width through a CSS variable, so a change glides. Full switchers share the width equally. */
+  const measure = () => {
+    const bs = opts.current.filter((b): b is HTMLButtonElement => !!b);
+    if (!bs.length) return;
+    if (full) { bs.forEach((b) => b.style.removeProperty("--opt-w")); return; }
+    const cs = getComputedStyle(bs[0]!);
+    const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    bs.forEach((b) => {
+      const content = b.firstElementChild as HTMLElement | null;
+      if (content) b.style.setProperty("--opt-w", `${content.offsetWidth + pad}px`);
+    });
+  };
+
+  const latestFns = useRef({ place, measure });
+  latestFns.current = { place, measure };
+
+  // Every render: a label or count may have changed, so options re-measure (and glide).
+  useLayoutEffect(measure);
+
+  // A new pick: the key glides there, and focus follows if it was inside.
+  useLayoutEffect(() => {
+    if (shown.current === current) return;
+    const first = shown.current === undefined;
+    shown.current = current;
+    if (!dragging.current) place(first || !placed ? "jump" : "glide");
+    const b = opts.current[active];
+    if (!first && b && root.current?.contains(document.activeElement)) b.focus({ preventScroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current]);
+
+  // Widths change during a glide, a font load or a container resize: the key follows, a frame behind.
+  const keys = options.map((o) => o.value).join("\n");
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    let frame = 0;
+    const sync = () => {
+      latestFns.current.measure();
+      if (dragging.current) return;
+      latestFns.current.place(performance.now() < glideEnds.current ? "retarget" : "jump");
+    };
+    const ro = new ResizeObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(sync); });
+    ro.observe(el);
+    el.querySelectorAll(`.${styles.switcherOption}, .${styles.switcherContent}`).forEach((n) => ro.observe(n));
+    // Width glides switch on after the first measure, so nothing grows in on load.
+    const ready = requestAnimationFrame(() => el.setAttribute("data-ready", ""));
+    return () => { ro.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(ready); };
+  }, [keys, full, size]);
+
+  /* Dragging: the key rides the pointer, keeps inside the well, and its width settles to the option under it. */
+  const follow = () => {
+    if (!dragging.current) return;
+    const first = opts.current[0], last = opts.current[options.length - 1];
+    if (!first || !last) return;
+    const w = span.get();
+    const lo = first.offsetLeft + w / 2;
+    const hi = Math.max(lo, last.offsetLeft + last.offsetWidth - w / 2);
+    const c = Math.min(Math.max(center.get(), lo), hi);
+    left.set(c - w / 2);
+    right.set(c + w / 2);
+  };
+  useMotionValueEvent(center, "change", follow);
+  useMotionValueEvent(span, "change", follow);
+
+  const localX = (clientX: number) => clientX - (root.current?.getBoundingClientRect().left ?? 0);
+
+  /** The option under (or nearest to) a horizontal pointer position. */
+  const indexAt = (clientX: number) => {
+    let best = -1;
+    let dist = Infinity;
+    opts.current.forEach((b, i) => {
+      if (!b) return;
+      const r = b.getBoundingClientRect();
+      const d = clientX < r.left ? r.left - clientX : clientX > r.right ? clientX - r.right : 0;
+      if (d < dist) { dist = d; best = i; }
+    });
+    return best;
+  };
+
+  const startDrag = () => {
+    dragging.current = true;
+    left.stop();
+    right.stop();
+    center.jump((left.get() + right.get()) / 2);
+    span.jump(right.get() - left.get());
+    const t = target();
+    if (t) animate(span, t.r - t.l, motionTokens.spring.snappy);
+  };
+
+  const endPress = () => {
+    press.current = null;
+    setPressed(false);
+    if (!dragging.current) return;
+    dragging.current = false;
+    place("snap");
+  };
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (disabled || e.button !== 0) return;
+    const i = indexAt(e.clientX);
+    const o = options[i];
+    const b = opts.current[i];
+    if (!o || !b || o.disabled) return;
+    const touch = e.pointerType === "touch";
+    // Touch picks on lift, so a swipe past the switcher never picks; the key itself can still be dragged.
+    const drag = !touch || o.value === latest.current;
+    press.current = { id: e.pointerId, x: e.clientX, touch, drag, moved: false, grab: localX(e.clientX) - (b.offsetLeft + b.offsetWidth / 2), over: i };
+    if (drag) setPressed(true);
+    if (touch) return;
+    select(o.value);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture is a nicety */ }
+  };
+
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const p = press.current;
+    if (!p || p.id !== e.pointerId) return;
+    if (!p.moved && Math.abs(e.clientX - p.x) < (p.touch ? 8 : 3)) return;
+    if (!p.moved) {
+      p.moved = true;
+      if (p.drag) startDrag();
+    }
+    if (!p.drag) return;
+    const to = localX(e.clientX) - p.grab;
+    if (reduced) center.set(to); else animate(center, to, FOLLOW);
+    const i = indexAt(e.clientX - p.grab);
+    const o = options[i];
+    const b = opts.current[i];
+    if (!o || !b || o.disabled || i === p.over) return;
+    p.over = i;
+    select(o.value);
+    animate(span, b.offsetWidth, motionTokens.spring.snappy);
+  };
+
+  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    const p = press.current;
+    if (!p || p.id !== e.pointerId) return;
+    if (p.touch && !p.moved) {
+      const o = options[indexAt(e.clientX)];
+      if (o) select(o.value);
+    }
+    endPress();
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    const enabled = options.flatMap((o, i) => (o.disabled ? [] : [i]));
+    const n = enabled.length;
+    if (!n) return;
+    const at = enabled.indexOf(options.findIndex((o) => o.value === latest.current));
+    const back = e.key === "ArrowLeft" || (!tabs && e.key === "ArrowUp");
+    const next = e.key === "ArrowRight" || (!tabs && e.key === "ArrowDown");
+    const to = back ? enabled[at < 0 ? n - 1 : (at - 1 + n) % n]
+      : next ? enabled[at < 0 ? 0 : (at + 1) % n]
+      : e.key === "Home" ? enabled[0]
+      : e.key === "End" ? enabled[n - 1]
+      : undefined;
+    if (to === undefined) return;
+    e.preventDefault();
+    select(options[to]!.value);
+    opts.current[to]?.focus();
+  };
+
   return (
-    <div role="radiogroup" aria-label={label} className={styles.switcher} data-full={full || undefined}>
-      {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} className={styles.switcherOption} onClick={() => onChange(o.value)}>
-          {value === o.value && <motion.span layoutId={`${id}-key`} className={styles.switcherKey} transition={keySpring} />}
-          <span className={styles.switcherText}>{o.label}{!!o.count && <span className={styles.count}>{o.count}</span>}</span>
-        </button>
-      ))}
+    <div ref={root} role={tabs ? "tablist" : "radiogroup"} aria-label={label} aria-orientation={tabs ? "horizontal" : undefined} aria-disabled={disabled || undefined}
+      className={cx(styles.switcher, className)} data-full={full || undefined} data-size={size} data-pressed={pressed || undefined} data-disabled={disabled || undefined}
+      onKeyDown={onKeyDown} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={endPress} onLostPointerCapture={endPress}>
+      <motion.span aria-hidden className={styles.switcherKey} data-placed={(placed && active >= 0) || undefined} style={{ x: left, width }} />
+      {options.map((o, i) => {
+        const on = i === active;
+        const name = [o.ariaLabel ?? o.label ?? o.value, o.count ? String(o.count) : "", o.badge ?? ""].filter(Boolean).join(", ");
+        return (
+          <button key={o.value} ref={(el) => { opts.current[i] = el; }} type="button" role={tabs ? "tab" : "radio"}
+            aria-checked={tabs ? undefined : on} aria-selected={tabs ? on : undefined} aria-controls={tabs ? o.controls : undefined} aria-label={name}
+            tabIndex={i === tabbable ? 0 : -1} disabled={o.disabled || disabled} className={styles.switcherOption} data-on={on || undefined}
+            // Keyboard and assistive tech. Pointer picks happen on the well, on press.
+            onClick={(e) => { if (e.detail === 0) select(o.value); }}>
+            <span className={styles.switcherContent}>
+              {o.icon && <span className={styles.switcherIcon}>{o.icon}</span>}
+              {o.label && (
+                // The strong copy holds the width; the two crossfade, so neighbours never shift.
+                <span className={styles.switcherLabel}><span>{o.label}</span><span aria-hidden>{o.label}</span></span>
+              )}
+              {!!o.count && <span className={styles.count}><RollNumber value={o.count} /></span>}
+              {o.badge && <Tag size="sm">{o.badge}</Tag>}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -177,7 +473,7 @@ export function NoteCard({ note, index, selected, onSeek, onApply, onDismiss, on
           {note.status === "open" && (
             <>
               <Key size="sm" variant="tertiary" onClick={stop(onDismiss)}>Dismiss</Key>
-              <Key size="sm" variant="secondary" onClick={stop(onApply)}>Apply</Key>
+              <CtaKey size="sm" intent="run" role="secondary" label={noteActionLabel(note.intents)} onClick={stop(onApply)} />
             </>
           )}
           {note.status === "queued" && (
@@ -225,3 +521,4 @@ export function SwatchPicker({ options, value, onChange, wide }: { options: { id
     </div>
   );
 }
+export { Tray, TrayCard, TrayRow, TraySpacer } from "./tray";

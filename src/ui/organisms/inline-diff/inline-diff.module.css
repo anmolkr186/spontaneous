@@ -1,0 +1,77 @@
+/* The text reads as one paragraph. Edits are told apart by material and
+   marks, never by hue: removed words are muted and struck in graphite on a
+   faint dark wash; new words keep the foreground on a faint light wash. */
+.text {
+  position: relative;
+  padding: var(--space-3) var(--tray-card-inset);
+  color: var(--foreground);
+  font-size: var(--text-base);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  user-select: text;
+}
+
+/* A pending edit: focusable, with a quiet ring when pointed at. */
+.change { border-radius: 3px; outline-offset: 1px; }
+.change[data-state="pending"] { cursor: default; }
+.change[data-state="pending"]:hover { outline: 1px solid var(--border); }
+.change[data-active]:not(:focus-visible) { outline: 1px solid var(--border-strong); }
+
+.removed, .inserted {
+  border-radius: 3px;
+  text-decoration: none;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-color 300ms var(--ease-standard), color 300ms var(--ease-standard);
+}
+.removed { background: var(--well-bg); color: var(--text-muted); }
+.inserted { background: var(--live-dim); color: var(--foreground); }
+.removed .t {
+  text-decoration: line-through;
+  text-decoration-color: var(--g-500);
+  text-decoration-thickness: 1.5px;
+  transition: text-decoration-color 300ms var(--ease-standard);
+}
+
+/* Decided: the side that stays settles into the text. */
+.change[data-state="accepted"] .inserted,
+.change[data-state="rejected"] .removed { background: transparent; color: var(--foreground); }
+.change[data-state="rejected"] .removed .t { text-decoration-color: transparent; }
+.change[data-state="accepted"] .removed,
+.change[data-state="rejected"] .inserted { background: transparent; }
+
+/* A word that can shrink to nothing. Clipped, so it's aligned to the top of
+   the line box (a clipped inline-block would otherwise sit on its bottom edge). */
+.word { display: inline-block; overflow: hidden; vertical-align: top; white-space: pre; }
+.word[data-gone] { max-width: 0; opacity: 0; }
+
+/* ── Popover: Accept and Reject over the active edit ─────────── */
+.pop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  gap: 2px;
+  padding: var(--space-0-5);
+  translate: -50% calc(-100% - 6px);
+  border-radius: var(--radius-md);
+  background: var(--dock-bg);
+  box-shadow: var(--dock-shadow);
+  white-space: nowrap;
+  user-select: none;
+}
+.pop[data-below] { translate: -50% 6px; }
+.pop :global(kbd) { min-width: 16px; height: 16px; margin-right: -4px; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.root .foot { display: flex; flex: 1; align-items: center; gap: var(--space-1); min-width: 0; }
+.left { display: inline-flex; align-items: baseline; gap: .3em; white-space: nowrap; }
+.steps { display: inline-flex; }
+.reviewed { display: inline-flex; align-items: center; gap: var(--space-1-5); color: var(--foreground); }
+.check { color: var(--success); }
+
+@media (prefers-reduced-motion: reduce) {
+  .removed, .inserted, .removed .t { transition: none; }
+}

@@ -1,0 +1,103 @@
+/* The tray settles in; the rows rise out of a small blur a beat apart.
+   Nothing changes size after that: ticking only repaints a row. */
+.root { animation: settle 420ms var(--ease-standard) both; }
+.title { height: 16px; }
+.count { display: inline-flex; align-items: baseline; gap: .3em; color: var(--text-secondary); }
+.root[data-complete] .count { color: var(--text-muted); }
+
+.body { padding: var(--space-3) var(--space-1) var(--space-1); }
+
+/* ── Bar: a well whose fill is the light face ─────────────────────
+   The fill is full width and slides in from the left, so its rounded
+   end keeps its shape at every value (no scaleX squash).            */
+.bar {
+  position: relative;
+  height: 6px;
+  margin: 0 var(--space-2) var(--space-2);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+}
+.fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--face-bg);
+  box-shadow: inset 0 -.5px 0 rgb(0 0 0 / .2);
+  translate: calc((var(--p) - 1) * 100%) 0;
+  transition: translate 900ms var(--ease-glide);
+}
+.sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 30%, var(--live-sheen) 50%, transparent 70%) 0 0 / 220% 100% no-repeat;
+  animation: sweep 1100ms var(--ease-standard) 120ms both;
+}
+
+/* ── Steps ───────────────────────────────────────────────────── */
+.list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; margin: 0; padding: 0; list-style: none; }
+.item { animation: rowIn 520ms var(--ease-standard) both; animation-delay: calc(140ms + var(--i) * var(--stagger)); }
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-2) 0 var(--space-1-5);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  text-align: left;
+  transition: background-color var(--duration-fast) var(--ease-standard), scale var(--duration-instant) var(--ease-standard);
+}
+.step:hover { background: var(--hover); }
+.step:active { scale: .985; }
+
+/* The box: a hairline ring that fills with the light face and pops, then the tick draws. */
+.box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.25px var(--g-500);
+  transition: background-color 200ms var(--ease-standard), box-shadow 200ms var(--ease-standard);
+}
+.step:hover .box { box-shadow: inset 0 0 0 1.25px var(--g-400); }
+.box svg { width: 12px; height: 12px; overflow: visible; fill: none; stroke: var(--face-fg); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.box path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 120ms ease-in; }
+.step[aria-checked="true"] .box {
+  background: var(--face-bg);
+  box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgb(0 0 0 / .16), 0 0 0 .5px rgb(0 0 0 / .6);
+  animation: pop 420ms var(--ease-pop);
+}
+.step[aria-checked="true"] .box path { stroke-dashoffset: 0; transition: stroke-dashoffset var(--duration-draw) var(--ease-standard) 140ms; }
+
+/* The label strikes through from the left while it fades to muted. */
+.label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 300ms var(--ease-standard); }
+.label > span {
+  background: linear-gradient(currentColor, currentColor) 0 56% / 0% 1px no-repeat;
+  transition: background-size 240ms var(--ease-standard);
+}
+.step[aria-checked="true"] .label { color: var(--text-muted); }
+.step[aria-checked="true"] .label > span { background-size: 100% 1px; transition: background-size 520ms var(--ease-standard) 200ms; }
+
+.icon { display: grid; flex: none; place-items: center; color: var(--text-muted); transition: opacity 300ms var(--ease-standard); }
+.icon svg { width: 14px; height: 14px; stroke-width: 1.75; }
+.step[aria-checked="true"] .icon { opacity: .5; }
+
+@keyframes settle { from { opacity: 0; translate: 0 6px; } }
+@keyframes rowIn { from { opacity: 0; translate: 0 6px; filter: blur(var(--blur-soft)); } }
+@keyframes pop { 0% { scale: .82; } 100% { scale: 1; } }
+@keyframes sweep { from { background-position: 120% 0; opacity: 1; } to { background-position: -20% 0; opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .root, .item, .sweep, .step[aria-checked="true"] .box { animation: none; }
+  .fill, .box, .box path, .label, .label > span, .icon { transition: none !important; }
+}

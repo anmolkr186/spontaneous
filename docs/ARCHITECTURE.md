@@ -214,6 +214,7 @@ Notes look like Flask's time-coded feedback: a pin on the timeline and a card in
 - The thread renders from an external store: Rust owns the thread state and React only renders it. The chat runtime is imported in one adapter (`src/ui/organisms/agent/runtime.ts`), so it can be swapped without touching components.
 - Message parts: text, collapsed reasoning, a card per tool call (edits get Undo), and `ask_user` and permission prompts as inline choice cards that answer the CLI over stdin.
 - Suggestions are driven by open notes ("Apply 3 open notes").
+- Which component renders which moment of a run (stream event, tool call or app state), with sample agent text for each: `docs/AGENT_UI.md`, generated from `src/ui/agent-ui/catalog.ts`. It also lists the UI tools the MCP server should add (`propose_plan`, `propose_text_edit`, `request_permission`, `try_variants`, `suggest_shot`, `answer_with_moments`, `reply_to_note`).
 
 ---
 
@@ -345,6 +346,8 @@ spontaneous/
 ---
 
 ## 13. Risks and open questions
+
+Product and design decisions (open, decided, and decided-but-not-built) are tracked in `docs/DECISIONS.md`. This section keeps the technical risks.
 
 - **Native layer under WKWebView.** We need to confirm that resize, Retina scale and live-resize sync are smooth. If not, fall back to a separate child NSWindow or a native canvas view next to the webview. Prototype this first in phase 3.
 - **AGPL references.** Recordly and Cap are reference only. Don't copy code.

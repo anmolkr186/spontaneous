@@ -1,0 +1,197 @@
+/* ── Agent plan ────────────────────────────────────────────────
+   A card of numbered steps on one rail. The number column carries
+   the run: ring → rays → a light cell with a drawn check, and the
+   rail between numbers fills down as each step finishes.            */
+.body { padding: var(--space-1) var(--space-1) var(--space-1-5); }
+.goal {
+  margin: 0;
+  padding: var(--space-2) var(--space-2) var(--space-1) var(--space-1-5);
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+}
+
+.list { position: relative; margin: 0; padding: 0; list-style: none; }
+
+/* ── Row ─────────────────────────────────────────────────────── */
+.row {
+  --focus-outline-offset: -1px;
+  position: relative;
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+.row[data-draft]:hover { background: var(--hover); }
+/* Lifted while dragged: the row becomes a key, sitting over its neighbours. */
+.row[data-dragging] { background: var(--key-bg); box-shadow: var(--key-shadow); }
+
+.rowInner {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  column-gap: var(--space-2-5);
+  padding: var(--space-2) var(--space-1-5) var(--space-2) var(--space-1-5);
+}
+
+/* The rail: from under this number to just above the next one. */
+.segment {
+  position: absolute;
+  top: 31px;
+  bottom: -5px;
+  left: calc(var(--space-1-5) + 9.25px);
+  width: 1.5px;
+  border-radius: 1px;
+  background: var(--border);
+  overflow: hidden;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.segmentFill {
+  position: absolute;
+  inset: 0;
+  background: var(--g-300);
+  transform-origin: top;
+  scale: 1 0;
+  transition: scale var(--duration-fold) var(--ease-glide);
+}
+.row[data-status="done"] .segmentFill { scale: 1 1; }
+.row[data-last] .segment, .row[data-dragging] .segment { opacity: 0; }
+
+/* ── Marker ──────────────────────────────────────────────────── */
+.marker {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: -1px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--g-600);
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  transition: box-shadow var(--duration-standard) var(--ease-standard);
+}
+.marker > * { grid-area: 1 / 1; transition: opacity 200ms ease, scale 320ms var(--ease-standard), filter 200ms ease; }
+.marker[data-status="running"] { box-shadow: inset 0 0 0 1px var(--live-dim); }
+.marker[data-status="done"], .marker[data-status="failed"] { box-shadow: inset 0 0 0 1px transparent; }
+
+.markerFill {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--g-200);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .55), inset 0 -1px 0 rgb(0 0 0 / .14);
+  opacity: 0;
+  scale: .4;
+}
+.marker[data-status="done"] .markerFill { opacity: 1; scale: 1; transition: opacity 160ms ease, scale 380ms var(--ease-pop); }
+.marker[data-status="failed"] .markerFill { opacity: 1; scale: 1; background: var(--rec-soft); box-shadow: none; }
+
+.markerNumber { display: inline-flex; }
+.marker:not([data-status="pending"]) .markerNumber { opacity: 0; scale: .5; filter: blur(var(--blur-soft)); }
+.marker:not([data-status="running"]) .markerRays { opacity: 0; scale: .45; filter: blur(var(--blur-soft)); }
+
+.markerCheck, .markerCross { width: 14px; height: 14px; overflow: visible; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.markerCheck { stroke: var(--face-fg); }
+.markerCross { stroke: var(--danger); }
+.markerCheck path, .markerCross path { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 120ms ease-in; }
+.marker:not([data-status="done"]) .markerCheck,
+.marker:not([data-status="failed"]) .markerCross { opacity: 0; }
+.marker[data-status="done"] .markerCheck path,
+.marker[data-status="failed"] .markerCross path { stroke-dashoffset: 0; transition: stroke-dashoffset var(--duration-draw) var(--ease-standard) 140ms; }
+
+/* ── Text ────────────────────────────────────────────────────── */
+.text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.title {
+  color: var(--foreground);
+  font-size: var(--text-base);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+  transition: color var(--duration-standard) var(--ease-standard);
+}
+.title[data-editable] { cursor: text; }
+.list:not([data-mode="draft"]) .row[data-status="pending"] .title { color: var(--text-secondary); }
+.list:not([data-mode="draft"]) .row[data-status="done"] .title { color: var(--text-muted); }
+
+.meta { display: flex; align-items: center; gap: var(--space-1-5); min-height: 16px; white-space: nowrap; }
+.range { display: inline-flex; align-items: center; gap: 1px; color: var(--text-faint); font-size: var(--text-xs); }
+.range .time { font-size: var(--text-xs); }
+
+.rename {
+  width: calc(100% + var(--space-1-5));
+  height: 22px;
+  margin: -2px 0 -2px calc(-1 * var(--space-1-5));
+  padding: 0 var(--space-1-5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-base);
+  outline: none;
+}
+
+.failure { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1-5); padding: var(--space-1) 0 1px; }
+.error { margin: 0; color: var(--danger); font-size: var(--text-sm); line-height: 1.4; }
+
+/* ── Side slot: remove + grip in review, the step's clock while running ── */
+.side { display: flex; align-items: flex-start; justify-content: flex-end; min-height: 18px; }
+.side > * { gap: 2px; }
+.row[data-draft] .side { opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard); }
+.row[data-draft]:is(:hover, :focus-within, [data-dragging]) .side,
+.row[data-draft]:focus-visible .side { opacity: 1; }
+.remove { margin-top: -3px; }
+.grip {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 24px;
+  margin-top: -3px;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none;
+  transition: color var(--duration-instant) var(--ease-standard);
+}
+.grip:hover { color: var(--text-secondary); }
+.grip svg { width: 14px; height: 14px; stroke-width: 1.9; }
+.row[data-dragging] .grip { cursor: grabbing; color: var(--text-secondary); }
+
+@media (hover: none) {
+  .row[data-draft] .side { opacity: 1; }
+}
+
+/* ── Add step ────────────────────────────────────────────────── */
+.add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  margin: var(--space-1) 0 1px;
+  padding: 0 var(--space-2-5);
+  border-radius: var(--radius-md);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+  color: var(--text-muted);
+}
+.add svg { width: 14px; height: 14px; flex: none; stroke-width: 1.9; }
+.addInput { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--foreground); font: inherit; font-size: var(--text-base); outline: none; }
+.addInput::placeholder { color: var(--text-muted); }
+
+/* ── Tray rows ───────────────────────────────────────────────── */
+.estimate { font-family: var(--font-mono); letter-spacing: 0; }
+.foot { flex: 1; display: flex; align-items: center; gap: var(--space-1-5); min-width: 0; }
+.hint { color: var(--text-faint); white-space: nowrap; }
+.status { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-secondary); white-space: nowrap; }
+.status[data-done] svg { color: var(--success); }
+.clock { margin-right: var(--space-1-5); }
+
+@container (max-width: 360px) {
+  .hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmentFill, .markerFill, .marker > * { transition: none; }
+}

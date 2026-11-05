@@ -2,9 +2,12 @@ import { forwardRef } from "react";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { Tooltip } from "@/ui/base/tooltip/tooltip";
 import { formatTime } from "@/editor/model";
+import { RaySpinner } from "./motion";
 import styles from "./atoms.module.css";
 
 export { SpontaneousMark as Mark } from "@/ui/brand/SpontaneousMark";
+export { AutoHeight, DrawCheck, Duration, Fold, RaySpinner, RollNumber, RollText, Shimmer, StatusGlyph, Swap, formatDuration, useNow } from "./motion";
+export type { GlyphStatus, RollTextProps } from "./motion";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -24,13 +27,24 @@ export interface KeyProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: KeyVariant;
   size?: KeySize;
   pressed?: boolean;
+  /**
+   * Working on it: rays replace the leading icon, a band of light sweeps the
+   * label, clicks are ignored. Stays focusable and says aria-busy, so focus
+   * isn't lost while it works.
+   */
+  loading?: boolean;
 }
 
 export const Key = forwardRef<HTMLButtonElement, KeyProps>(function Key(
-  { variant = "secondary", size = "md", pressed, className, type = "button", ...props },
+  { variant = "secondary", size = "md", pressed, loading, className, type = "button", children, onClick, ...props },
   ref,
 ) {
-  return <button ref={ref} type={type} data-variant={variant} data-size={size} aria-pressed={pressed} className={cx(styles.key, className)} {...props} />;
+  return (
+    <button ref={ref} type={type} data-variant={variant} data-size={size} aria-pressed={pressed} aria-busy={loading || undefined} data-loading={loading || undefined}
+      className={cx(styles.key, className)} onClick={loading ? (e) => e.preventDefault() : onClick} {...props}>
+      {loading ? <><RaySpinner size={14} className={styles.keySpin} /><span className={styles.keyLabel}>{children}</span></> : children}
+    </button>
+  );
 });
 
 export interface IconKeyProps extends KeyProps {

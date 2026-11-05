@@ -27,6 +27,7 @@ import type { EditorMode, InspectorTab } from "./store";
 import { useAgent } from "./agent";
 import { useAgentUpdate } from "./agent-update";
 import { AGENT_EFFORTS, AGENT_MODELS, effortLabel } from "./agent-stream";
+import { CtaKey, CtaRegion, CtaRoot, exportLabel, notesLabel } from "@/ui/cta";
 import { cursorAtTime, projectFromRecording } from "./recording";
 import styles from "./editor.module.css";
 
@@ -45,6 +46,8 @@ export function Editor() {
   if (isTauri && !hasRecording) return <NewProject />;
   return (
     <AgentRuntimeProvider runtime={runtime}>
+      {/* One election for the window: each region below shows one primary, and Export waits while work is pending. */}
+      <CtaRoot>
       <div className={styles.app} data-mode={mode} data-preview={previewing || undefined}
         data-left-closed={!panels.left || undefined} data-right-closed={!panels.right || undefined}
         data-moved-left={moved.left || undefined} data-moved-right={moved.right || undefined}>
@@ -55,6 +58,7 @@ export function Editor() {
         <AgentUpdate />
         {mode === "studio" ? <TimelinePanel /> : !previewing && <ScrubBar />}
       </div>
+      </CtaRoot>
     </AgentRuntimeProvider>
   );
 }
@@ -219,6 +223,8 @@ function TopBar() {
   const canUndo = useEditor((s) => s.past.length > 0);
   const canRedo = useEditor((s) => s.future.length > 0);
   const panels = useEditor((s) => s.panels);
+  // Finishing waits for the work: the election handles open notes and decisions; a run in progress holds it here.
+  const working = useAgent((s) => s.running || s.queue.length > 0);
   const { undo, redo, setMode, togglePanel } = useEditor.getState();
   return (
     <header className={styles.top} data-tauri-drag-region>
@@ -240,7 +246,9 @@ function TopBar() {
         <IconKey label="Undo" shortcut="⌘Z" size="sm" disabled={!canUndo} onClick={undo}><Undo2 /></IconKey>
         <IconKey label="Redo" shortcut="⇧⌘Z" size="sm" disabled={!canRedo} onClick={redo}><Redo2 /></IconKey>
         <IconKey label="Share" size="sm"><Share /></IconKey>
-        <Key variant="primary" size="sm" style={{ marginLeft: 6, height: 26, padding: "0 12px" }}>Export</Key>
+        <CtaRegion name="titlebar">
+          <CtaKey intent="finish" size="sm" label={exportLabel()} role={working ? "secondary" : undefined} style={{ marginLeft: 6, height: 26, padding: "0 12px" }} />
+        </CtaRegion>
         <span className={styles.topDivider} aria-hidden />
         <IconKey label={panels.right ? "Hide agent and notes" : "Show agent and notes"} shortcut="⌘]" size="sm" onClick={() => togglePanel("right")}>
           {panels.right ? <PanelRightClose /> : <PanelRightOpen />}
@@ -574,9 +582,9 @@ function ShotPreview() {
               {hasClip && (
                 <>
                   <DockDivider />
-                  <Key variant="primary" className={styles.backToClip} onClick={() => useEditor.getState().setPreview(false)}>
-                    <Film size={14} />Back to clip
-                  </Key>
+                  <CtaRegion name="stage">
+                    <CtaKey intent="navigate" className={styles.backToClip} icon={<Film size={14} />} label="Back to clip" onClick={() => useEditor.getState().setPreview(false)} />
+                  </CtaRegion>
                 </>
               )}
             </Dock>
@@ -650,7 +658,7 @@ function SidePanel() {
         </span>
       </>
     }>
-      {side === "agent" ? <AgentPane /> : <NotesPane />}
+      {side === "agent" ? <CtaRegion name="agent"><AgentPane /></CtaRegion> : <CtaRegion name="notes"><NotesPane /></CtaRegion>}
     </Panel>
   );
 }
@@ -674,10 +682,11 @@ function AgentConversation() {
   const items = useMemo(() => {
     if (running || queue.length) return [];
     const list = [];
-    if (open.length) list.push({ id: "apply", label: isTauri ? (open.length === 1 ? "Plan open note" : `Plan ${open.length} open notes`) : open.length === 1 ? "Apply open note" : `Apply ${open.length} open notes`, onSelect: () => applyNotes() });
+    // In the app the agent can only plan for now, so the key says so.
+    if (open.length) list.push({ id: "apply", intent: "run" as const, label: isTauri ? (open.length === 1 ? "Plan open note" : `Plan ${open.length} open notes`) : notesLabel(open), onSelect: () => applyNotes() });
     list.push({ id: "launch", label: "Draft a launch cut", onSelect: () => send("Draft a launch cut from these clips") });
     return list;
-  }, [open.length, running, queue.length, applyNotes, send]);
+  }, [open, running, queue.length, applyNotes, send]);
   return (
     <AgentThread
       suggestions={<SuggestionChips items={items} />}
@@ -755,9 +764,7 @@ function NotesPane() {
             {open.length} open{working.length ? ` · ${working.length} in progress` : ""} · {applied.length} applied
           </span>
           {working.length > 0 && <Key size="sm" variant="tertiary" onClick={() => setSide("agent")}>Watch</Key>}
-          <Key size="sm" variant="primary" disabled={!open.length} onClick={() => applyNotes()}>
-            {isTauri ? (open.length > 1 ? `Plan ${open.length}` : "Plan") : open.length > 1 ? `Apply ${open.length}` : "Apply"}
-          </Key>
+          <CtaKey size="sm" intent="run" count={open.length} label={isTauri ? (open.length === 1 ? "Plan open note" : `Plan ${open.length} open notes`) : notesLabel(open)} disabled={!open.length} reason="No open notes" onClick={() => applyNotes()} />
         </div>
       )}
     </>
@@ -779,7 +786,8 @@ function ScrubBar() {
   };
   return (
     <div className={styles.scrub}>
-      <Key variant="primary" aria-label={playing ? "Pause" : "Play"} onClick={() => setPlaying(!playing)} style={{ width: 30, height: 30, padding: 0, borderRadius: "50%" }}>
+      {/* Transport, not a call to action: key material, so it never competes with the surface's primary. */}
+      <Key variant="secondary" aria-label={playing ? "Pause" : "Play"} onClick={() => setPlaying(!playing)} style={{ width: 30, height: 30, padding: 0, borderRadius: "50%" }}>
         {playing ? <Pause size={13} fill="currentColor" strokeWidth={0} /> : <Play size={13} fill="currentColor" strokeWidth={0} style={{ marginLeft: 1 }} />}
       </Key>
       <Timecode value={time} />

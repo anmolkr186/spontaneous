@@ -1,0 +1,100 @@
+/* ── CommandMenu ─────────────────────────────────────────────────
+   A dock slab: the field in a well on top, grouped rows under it,
+   and a quiet footer row for the keys and for what just ran.
+   Radii are concentric: slab 14, field and rows 10 (14 − 4 pad).   */
+.menu {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 560px;
+  padding: var(--dock-pad);
+  border-radius: var(--radius-tray);
+  background: var(--dock-bg);
+  box-shadow: var(--dock-shadow);
+  color: var(--foreground);
+  font-size: var(--text-base);
+  container-type: inline-size;
+}
+
+/* The field: a well with the search glyph. */
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 38px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+  color: var(--text-muted);
+}
+.field svg { flex: none; width: 15px; height: 15px; stroke-width: 1.75; }
+.input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--foreground); font: inherit; font-size: var(--text-base); outline: none; }
+.input::placeholder { color: var(--text-muted); }
+
+/* The list glides to the height of what it found, up to ten rows. */
+.list {
+  --list-max: 336px;
+  height: min(var(--list-h, var(--list-max)), var(--list-max));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / .08) transparent;
+}
+.list[data-ready] { transition: height var(--duration-fold) var(--ease-glide); }
+.inner { padding: var(--space-1) 0; }
+.group + .group { margin-top: var(--space-1); }
+.groupLabel { display: flex; align-items: center; height: 26px; padding: 0 var(--space-2-5); color: var(--text-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+
+/* A row. The highlight is one key that glides between rows. */
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  height: 32px;
+  padding: 0 var(--space-2) 0 var(--space-2-5);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  transition: scale var(--duration-instant) var(--ease-standard), color var(--duration-instant) var(--ease-standard);
+}
+.row[data-active] { color: var(--foreground); }
+.row[data-pressing] { scale: .98; }
+.highlight { position: absolute; inset: 0; border-radius: inherit; background: var(--key-bg); box-shadow: var(--key-shadow); }
+.icon, .label, .hint, .keys { position: relative; }
+.icon { display: grid; flex: none; place-items: center; width: 16px; height: 16px; color: var(--text-muted); transition: color var(--duration-instant) var(--ease-standard); }
+.row[data-active] .icon { color: var(--foreground); }
+.icon svg { width: 14px; height: 14px; stroke-width: 1.75; }
+.label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Filtering: matched letters stay bright, the rest dims. */
+.label[data-filtered] { color: var(--text-muted); }
+.row[data-active] .label[data-filtered] { color: var(--text-secondary); }
+.hit { color: var(--foreground); }
+.hint { flex: none; color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; }
+.keys { display: inline-flex; flex: none; gap: 3px; margin-left: auto; }
+
+/* Footer: the keys at rest; a drawn check and what happened after a run. */
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tray-row);
+  padding: 0 var(--space-1-5) 0 var(--space-2-5);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+.footSlot { flex: 1; min-width: 0; }
+.hints { display: inline-flex; align-items: center; gap: var(--space-3); white-space: nowrap; }
+.hints > span, .esc { display: inline-flex; align-items: center; gap: var(--space-1); }
+.ran { display: inline-flex; align-items: center; gap: var(--space-1-5); min-width: 0; color: var(--foreground); white-space: nowrap; }
+.check { color: var(--success); }
+.esc { flex: none; }
+
+@container (max-width: 380px) {
+  .keys, .hint, .hints > span + span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list[data-ready], .row, .icon { transition: none; }
+}

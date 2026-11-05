@@ -12,36 +12,91 @@
 .hint { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
 
 /* ── Switcher ────────────────────────────────────────────────────
-   A well holding keys; the selected option rises as a key.          */
+   A well holding options; the chosen one rises as a key. The key is
+   one element under the options: its edges are placed from JS, so
+   it can glide, stretch, follow a drag and follow width changes.
+   Options are as wide as their content (--opt-w, measured) and glide
+   when it changes. Sizes: sm 24, md 30, lg 34px tall overall.        */
 .switcher {
+  --pad: 3px;
+  --opt-h: var(--control-height-sm);
+  --opt-px: var(--space-3);
+  --opt-r: var(--radius-md);
+  --opt-fs: var(--text-sm);
+  --opt-icon: 14px;
   position: relative;
   display: inline-flex;
   gap: var(--space-0-5);
-  padding: 3px;
-  border-radius: calc(var(--radius-md) + 3px);
+  max-width: 100%;
+  padding: var(--pad);
+  border-radius: calc(var(--opt-r) + var(--pad));
   background: var(--well-bg);
   box-shadow: var(--well-shadow);
+  vertical-align: middle;
+  /* Sideways drags move the key; vertical ones still scroll the page. */
+  touch-action: pan-y;
 }
+.switcher[data-size="sm"] { --pad: 2px; --opt-h: 20px; --opt-px: var(--space-2-5); --opt-r: var(--radius-sm); --opt-fs: var(--text-xs); --opt-icon: 13px; }
+.switcher[data-size="lg"] { --opt-h: var(--control-height-md); --opt-px: var(--space-4); --opt-fs: var(--text-base); --opt-icon: 15px; }
 .switcher[data-full] { display: flex; }
+.switcher[data-disabled] { opacity: .5; }
 .switcherOption {
   position: relative;
-  flex: 1;
-  height: var(--control-height-sm);
-  padding: 0 var(--space-3);
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--opt-w, auto);
+  height: var(--opt-h);
+  padding: 0 var(--opt-px);
+  overflow: clip;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--opt-r);
   background: none;
   color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--opt-fs);
   font-weight: var(--weight-medium);
   white-space: nowrap;
   transition: color var(--duration-fast) var(--ease-standard);
 }
-.switcherOption:hover { color: var(--text-secondary); }
-.switcherOption[aria-checked="true"] { color: var(--foreground); }
-.switcherKey { position: absolute; inset: 0; border-radius: inherit; background: var(--key-bg-on); box-shadow: var(--key-shadow); }
-.switcherText { position: relative; display: inline-flex; align-items: center; gap: var(--space-1-5); }
-.count { color: var(--ink); font-variant-numeric: tabular-nums; }
+.switcher[data-ready]:not([data-full]) .switcherOption { transition: color var(--duration-fast) var(--ease-standard), width var(--duration-glide) var(--ease-standard); }
+.switcher[data-full] .switcherOption { flex: 1 1 0; }
+.switcherOption:not([data-on], :disabled):hover { color: var(--text-secondary); }
+.switcherOption[data-on] { color: var(--foreground); }
+.switcherOption:disabled { opacity: .4; }
+
+/* The key: machined, lit top edge. Gives a little while pressed or dragged. */
+.switcherKey {
+  position: absolute;
+  top: var(--pad);
+  left: 0;
+  height: var(--opt-h);
+  border-radius: var(--opt-r);
+  background: var(--key-bg-on);
+  box-shadow: var(--key-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: scale var(--duration-instant) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard);
+}
+.switcherKey[data-placed] { opacity: 1; }
+.switcher[data-pressed] .switcherKey { scale: .97; }
+
+.switcherContent { display: inline-flex; flex: none; align-items: center; gap: var(--space-1-5); }
+.switcherIcon { display: grid; flex: none; place-items: center; width: var(--opt-icon); height: var(--opt-icon); }
+.switcherIcon svg { width: 100%; height: 100%; stroke-width: 1.75; }
+/* Medium and strong copies of the label stacked; the strong one reserves the width. */
+.switcherLabel { display: grid; justify-items: center; }
+.switcherLabel > span { grid-area: 1 / 1; transition: opacity var(--duration-fast) var(--ease-standard); }
+.switcherLabel > span + span { font-weight: var(--weight-strong); opacity: 0; }
+.switcherOption[data-on] .switcherLabel > span:first-child { opacity: 0; }
+.switcherOption[data-on] .switcherLabel > span + span { opacity: 1; }
+.count { color: var(--ink); font-variant-numeric: tabular-nums; animation: countIn var(--duration-standard) var(--ease-standard) both; }
+@keyframes countIn { from { opacity: 0; translate: 0 3px; filter: blur(var(--blur-soft)); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .switcherOption, .switcher[data-ready]:not([data-full]) .switcherOption, .switcherKey, .switcherLabel > span { transition: none; }
+  .count { animation: none; }
+}
 
 /* ── ToggleKey (dock) ────────────────────────────────────────── */
 .toggle {
@@ -163,7 +218,9 @@
 
 /* ── Forced states (docs previews): [data-force] on an ancestor renders the state statically. ── */
 :global([data-force="hover"]) .source, :global([data-force="hover"]) .toggle { background: var(--hover); color: var(--text-secondary); }
-:global([data-force="hover"]) .switcherOption { color: var(--text-secondary); }
+:global([data-force="hover"]) .switcherOption:not([data-on]) { color: var(--text-secondary); }
+:global([data-force="active"]) .switcherKey { scale: .97; }
+:global([data-force="focus"]) .switcherOption[data-on] { outline: 2px solid rgb(236 236 239 / .55); outline-offset: 2px; }
 :global([data-force="hover"]) .note { box-shadow: var(--card-shadow-hover); }
 :global([data-force="focus"]) .source, :global([data-force="focus"]) .toggle { outline: 2px solid rgb(236 236 239 / .55); outline-offset: 2px; }
 

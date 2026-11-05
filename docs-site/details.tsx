@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Mic, MicOff, Monitor, MousePointer2, PenLine, Undo2 } from "lucide-react";
+import { Mic, MicOff, Monitor, MousePointer2, PenLine, RectangleHorizontal, RectangleVertical, Square, Undo2, Upload } from "lucide-react";
 import { Cell, IconKey, Key, Mark, Tag } from "@/ui/atoms";
 import { NoteCard, SourceKey, Switcher, ToggleKey } from "@/ui/molecules";
 import { DockTool } from "@/ui/organisms/dock";
@@ -102,12 +102,14 @@ export const DETAILS: Record<string, Details> = {
       { name: "Toggled", note: "aria-pressed: stays seated", render: () => <Key pressed>Loop</Key> },
       { name: "Focus", note: "Keyboard only: 2px outline", render: () => <Force state="focus"><Key>Apply</Key></Force> },
       { name: "Disabled", note: "40% and no pointer", render: () => <div style={{ display: "flex", gap: 8 }}><Key variant="primary" disabled>Export</Key><Key disabled>Apply</Key></div> },
+      { name: "Loading", note: "Rays replace the icon, the label sweeps, aria-busy", render: () => <div style={{ display: "flex", gap: 8 }}><Key variant="primary" loading><Upload />Export</Key><Key loading>Applying</Key></div> },
     ],
     interactions: [
       { input: "Hover", response: "Background shifts to the hover gradient over 120ms." },
       { input: "Press", response: "Moves down 0.5px and scales to .98 with an inset shadow; releases on the standard ease in 120ms." },
       { input: "Tab / Shift-Tab", response: "Focus ring appears only for keyboard focus." },
       { input: "Enter / Space", response: "Activates, same as click." },
+      { input: "loading", response: "Rays rise in where the leading icon was and a band of light sweeps the label; clicks are ignored, focus stays." },
     ],
   },
   "icon-key": {
@@ -166,18 +168,30 @@ export const DETAILS: Record<string, Details> = {
     ],
   },
   switcher: {
-    limit: "2–5 options. One per surface level (mode, panel, tab).",
+    limit: "2–5 options, 3 sizes. One switcher per level of a surface (mode, panel, tab); never two side by side for the same choice.",
     variants: [
-      { name: "inline", when: "Modes and panels in a header (Lite/Studio, Agent/Notes)." },
-      { name: "full", when: "Inspector tabs and enums that fill a column." },
+      { name: "inline", when: "Modes and panels in a header: Lite/Studio, Agent/Notes. Options as wide as their words." },
+      { name: "full", when: "Inspector tabs and enums that fill a column: Shot/Style/Cursor/Motion, aspect ratio." },
+      { name: "tabs", when: "Each option shows its own panel. Tablist semantics; give options controls." },
+      { name: "sm / md / lg", when: "sm in dense rows and popovers, md in headers and the inspector, lg on its own in a sheet or dialog." },
     ],
     states: [
-      { name: "Selected", note: "Option rises as a key", render: () => <Switcher label="Mode" value="lite" onChange={() => {}} options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} /> },
-      { name: "With count", note: "Open items in ink", render: () => <Switcher label="Panel" value="agent" onChange={() => {}} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: 2 }]} /> },
-      { name: "Hover", note: "Unselected text brightens", render: () => <Force state="hover"><Switcher label="Mode" value="lite" onChange={() => {}} options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} /></Force> },
+      { name: "Selected", note: "The pick rises as a key; its label turns strong", render: () => <Switcher label="Mode" value="lite" options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} /> },
+      { name: "With count", note: "Open items in ink", render: () => <Switcher label="Panel" value="agent" options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: 2 }]} /> },
+      { name: "With icons", note: "14px lucide icons before the words", render: () => <Switcher label="Aspect ratio" value="16:9" options={[{ value: "16:9", label: "16:9", icon: <RectangleHorizontal /> }, { value: "9:16", label: "9:16", icon: <RectangleVertical /> }, { value: "1:1", label: "1:1", icon: <Square /> }]} /> },
+      { name: "Icon only", note: "Needs ariaLabel", render: () => <Switcher label="Aspect ratio" value="9:16" options={[{ value: "16:9", ariaLabel: "16:9", icon: <RectangleHorizontal /> }, { value: "9:16", ariaLabel: "9:16", icon: <RectangleVertical /> }, { value: "1:1", ariaLabel: "1:1", icon: <Square /> }]} /> },
+      { name: "With badge", note: "A neutral Tag, words only", render: () => <Switcher label="Shot set" value="basics" options={[{ value: "basics", label: "Basics" }, { value: "directors-cut", label: "Director's Cut", badge: "New" }]} /> },
+      { name: "Disabled option", note: "40%, skipped by keys and drags", render: () => <Switcher label="Export size" value="1080p" options={[{ value: "720p", label: "720p" }, { value: "1080p", label: "1080p" }, { value: "4k", label: "4K", disabled: true }]} /> },
+      { name: "Hover", note: "Unchosen words brighten", render: () => <Force state="hover"><Switcher label="Mode" value="lite" options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} /></Force> },
+      { name: "Pressed", note: "The key gives to .97", render: () => <Force state="active"><Switcher label="Mode" value="lite" options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} /></Force> },
+      { name: "Focus", note: "Keyboard only: ring on the pick", render: () => <Force state="focus"><Switcher label="Mode" value="studio" options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} /></Force> },
+      { name: "Sizes", note: "sm 24, md 30, lg 34px", render: () => <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>{(["sm", "md", "lg"] as const).map((z) => <Switcher key={z} size={z} label={`Mode, ${z}`} value="studio" options={[{ value: "lite", label: "Lite" }, { value: "studio", label: "Studio" }]} />)}</div> },
     ],
     interactions: [
-      { input: "Click an option", response: "The key slides to it on a critically damped spring (visual 320ms, no bounce)." },
+      { input: "Click an option", response: "Picks on press. The key glides there; its leading edge arrives in 270ms and the trailing edge in 400ms, so it stretches a little and settles." },
+      { input: "Press and drag the key", response: "The key gives to .97 and rides the pointer, picking each option it crosses; its width settles to the option under it. On release it snaps into place on a no-bounce spring." },
+      { input: "← → ↑ ↓ / Home / End", response: "Pick and focus the neighbour, wrapping around; disabled options are skipped. Tabs only use ← →." },
+      { input: "A label or count changes", response: "The option and the well glide to the new width over 460ms and the key follows; a new count blurs in, changed digits roll." },
       { input: "⌘1 / ⌘2", response: "Switches Lite and Studio from anywhere in the editor." },
     ],
   },

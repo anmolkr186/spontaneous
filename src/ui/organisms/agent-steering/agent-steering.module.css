@@ -1,0 +1,131 @@
+/* ── Agent steering ────────────────────────────────────────────
+   The plan, the notes waiting for the next step, and the field.
+   Notes carry the ink cell: they are the person's words.            */
+.body { padding: var(--space-1) var(--space-1) var(--space-1-5); }
+.title {
+  margin: 0;
+  padding: var(--space-2) var(--space-2) var(--space-1) var(--space-1-5);
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+}
+
+/* ── Plan ────────────────────────────────────────────────────── */
+.steps { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.step {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-2-5);
+  row-gap: var(--space-1);
+  min-height: 30px;
+  padding: var(--space-1-5) var(--space-2) var(--space-1-5) var(--space-1-5);
+}
+.glyph { display: inline-grid; place-items: center; }
+/* A step finishing in front of you: its check lands with one small overshoot. */
+.glyph[data-popped] { animation: pop 380ms var(--ease-pop) both; }
+@keyframes pop { from { scale: .55; } }
+
+.stepTitle { min-width: 0; color: var(--text-muted); font-size: var(--text-base); line-height: 18px; overflow-wrap: anywhere; transition: color var(--duration-standard) var(--ease-standard); }
+.step[data-status="active"] .stepTitle { color: var(--foreground); }
+.step[data-status="done"] .stepTitle { color: var(--text-secondary); }
+.took { display: inline-flex; }
+
+/* Notes a step took in sit under its title. */
+.notes { display: flex; grid-column: 2 / -1; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+/* ── A note ──────────────────────────────────────────────────── */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  margin-left: calc(-1 * var(--space-1-5));
+  padding: 2px var(--space-1-5);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 16px;
+}
+.noteCell { margin-top: 5px; }
+.noteText { min-width: 0; overflow-wrap: anywhere; }
+.note[data-single] { flex: 1; min-width: 0; margin-left: 0; }
+.note[data-single] .noteText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Landed: a soft wash of light that fades back into the row. */
+.note[data-lit] { animation: lit 1200ms var(--ease-standard) both; }
+@keyframes lit {
+  0% { background-color: rgb(255 255 255 / .1); color: var(--foreground); }
+  100% { background-color: rgb(255 255 255 / 0); }
+}
+
+/* ── Queue ───────────────────────────────────────────────────── */
+.queue { padding: var(--space-1-5) 0 var(--space-0-5); }
+.queueHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  height: 22px;
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+.count { color: var(--text-faint); }
+.queueList { display: flex; flex-direction: column; margin: 0; padding: 0 0 0 var(--space-1-5); list-style: none; }
+.queued { display: flex; align-items: center; gap: 2px; min-height: 28px; }
+.now { flex: none; }
+
+/* ── Field ───────────────────────────────────────────────────── */
+.composer { padding: var(--space-1-5) 0 1px; }
+.field {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2-5);
+  border-radius: var(--radius-md);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+}
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+  max-height: 96px;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-base);
+  line-height: 18px;
+  resize: none;
+  outline: none;
+  field-sizing: content;
+}
+.input::placeholder { color: var(--text-muted); }
+.send { flex: none; }
+.hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-1-5) 0 var(--space-0-5);
+  padding: 0 var(--space-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+.hint > span { display: inline-flex; align-items: center; gap: 3px; }
+
+/* ── Tray rows ───────────────────────────────────────────────── */
+.clock { font-size: var(--text-xs); }
+.foot { flex: 1; display: flex; align-items: center; gap: var(--space-1-5); min-width: 0; }
+.state { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-secondary); white-space: nowrap; }
+.state[data-done] svg { color: var(--success); }
+
+@container (max-width: 360px) {
+  .hint > .hintExtra { display: none; }
+  .step { padding-inline: var(--space-1-5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glyph[data-popped], .note[data-lit] { animation: none; }
+}

@@ -123,6 +123,35 @@
     0 1px 2px rgb(0 0 0 / .3),
     0 6px 16px rgb(0 0 0 / .32);
 
+  /* Tray: the quiet frame an agent card sits in. The card is a slab lit from
+     the top; the tray is a shallow well around it whose header and footer rows
+     carry the meta (counts, clocks, status) and the actions. */
+  --tray-bg: rgb(0 0 0 / .2);
+  --tray-shadow:
+    inset 0 1px 1px rgb(0 0 0 / .35),
+    inset 0 0 0 1px rgb(255 255 255 / .03),
+    0 1px 0 rgb(255 255 255 / .03);
+  --tray-pad: 3px;
+  --radius-tray: 14px;
+  --radius-tray-card: calc(var(--radius-tray) - var(--tray-pad)); /* 11px */
+  --tray-card-bg: linear-gradient(180deg, #1c1c20 0%, #161619 100%);
+  --tray-card-shadow:
+    inset 0 1px 0 rgb(255 255 255 / .055),
+    inset 0 0 0 1px rgb(255 255 255 / .045),
+    0 0 0 .5px rgb(0 0 0 / .65),
+    0 1px 2px rgb(0 0 0 / .35),
+    0 4px 12px rgb(0 0 0 / .22);
+  --tray-row: 30px;
+  /* Where everything in a tray starts: its padding plus the rows' padding (13px).
+     Header icons, card icons and nodes sit on this edge; text sits on it + 14 + 6. */
+  --tray-inset: calc(var(--tray-pad) + var(--space-2-5));
+  --tray-card-inset: var(--space-2-5); /* the same edge, measured inside the card */
+
+  /* Live: the agent at work. The light face from the mark, never a hue. */
+  --live: var(--g-100);
+  --live-dim: rgb(228 228 232 / .22);
+  --live-sheen: rgb(255 255 255 / .9);
+
   --card-shadow: inset 0 0 0 1px var(--border-subtle), inset 0 1px 0 rgb(255 255 255 / .025);
   --card-shadow-hover: inset 0 0 0 1px var(--border), inset 0 1px 0 rgb(255 255 255 / .035);
 
@@ -212,6 +241,20 @@
   --ease-panel: linear(0, .048, .161, .301, .446, .58, .697, .792, .867, .922, .962, .989, 1.005, 1.015, 1.019, 1.02, 1.019, 1.016, 1.013, 1.01, 1.008, 1.006, 1.004, 1.002, 1.001, 1.001, 1, 1);
   --panel-duration: 460ms;
   --collapse-duration: 110ms;
+
+  /* Agent motion vocabulary. Content never pops in hard: it arrives out of a
+     small blur and settles, and leaves into one. Sizes glide to fit new content. */
+  --ease-glide: cubic-bezier(.32, .72, .24, 1);   /* sheets, folds, version switchers: a drawer's curve */
+  --ease-pop: cubic-bezier(.34, 1.56, .64, 1);     /* small marks only (checks, votes): one 5% overshoot */
+  --duration-roll: 460ms;      /* a label rolling in */
+  --duration-roll-out: 320ms;  /* the old label rolling out: always quicker */
+  --duration-fold: 380ms;      /* height folds (grid rows 0fr → 1fr) */
+  --duration-glide: 460ms;     /* width glides to new content */
+  --duration-draw: 360ms;      /* a check or cross drawing itself */
+  --duration-sweep: 1.6s;      /* one pass of the shimmer band */
+  --blur-roll: 3px;            /* labels and words */
+  --blur-soft: 2px;            /* icons, rows, status swaps */
+  --stagger: 60ms;             /* rows arriving a beat after each other */
 
   /* Neutral aliases some base controls read. */
   --neutral-0: var(--g-50);
