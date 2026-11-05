@@ -6,9 +6,7 @@ Each entry: **what**, **why**, **where it lives**, and the date. Dates are when 
 
 ## Open: needs a decision
 
-- **Play is no longer a primary** (2026-11-06)
-  - The round Play key in Lite moved from the light face to key material, because transport isn't a call to action and it competed with the surface's primary (`src/editor/Editor.tsx`, ScrubBar).
-  - Confirm by eye in the app.
+Nothing open right now.
 
 ## To do: decided, not built yet
 
@@ -70,6 +68,8 @@ Each entry: **what**, **why**, **where it lives**, and the date. Dates are when 
   - When several agent asks wait on the panel at once (e.g. two Approval cards), the oldest holds the primary and the next one rises when it's answered. ⌘↵ answers whichever card has focus; it isn't a global shortcut.
   - Any other tie still goes to the newest, so Send beats a suggestion once you've typed (`src/ui/cta/elect.ts`, `breaksTie`).
   - Chosen over newest first, and over showing one ask at a time with the rest folded.
+- **Play is transport, not a primary** (2026-11-06)
+  - The round Play key in Lite is key material, not the light face, so it never competes with a surface's primary (`src/editor/Editor.tsx`, ScrubBar). Checked by eye in the editor.
 - **A destructive primary takes a red face** (2026-11-06)
   - When a destructive action holds the primary ("Delete 3 takes", "Overwrite export"), the light face becomes red with white text (`src/ui/cta/cta-key.module.css`).
   - It's the only primary that takes a hue. Red already means recording and destructive, so it stays within the signals.
