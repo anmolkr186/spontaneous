@@ -1,6 +1,6 @@
 [package]
 name = "spontaneous-capture"
-version = "0.1.0"
+version.workspace = true
 description = "Screen, audio and input capture for Spontaneous (ScreenCaptureKit)"
 edition.workspace = true
 rust-version.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "spontaneous"
-version = "0.1.0"
+version.workspace = true
 description = "Record, annotate and animate UI recordings"
 authors = ["Anmol Kumar"]
 license = ""

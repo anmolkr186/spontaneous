@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Spontaneous",
-  "version": "0.1.0",
+  "version": "../package.json",
   "identifier": "app.spontaneous.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -56,7 +56,6 @@
     ],
     "macOS": {
       "minimumSystemVersion": "15.0",
-      "signingIdentity": "Apple Development: Anmol Kumar (6BY22KXC2V)",
       "entitlements": "./Entitlements.plist",
       "hardenedRuntime": true
     }

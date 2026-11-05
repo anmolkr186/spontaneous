@@ -7,3 +7,5 @@ src-tauri/gen/
 .env*
 *.tsbuildinfo
 .vite/
+.cargo/config.toml
+artifacts/
