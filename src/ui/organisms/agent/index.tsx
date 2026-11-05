@@ -99,13 +99,15 @@ export interface CliUpdateNoticeProps {
   state: { status: "idle" | "updating" } | { status: "updated"; version: string } | { status: "failed"; error: string };
   onUpdate: () => void;
   onDismiss: () => void;
+  /** Floats under the title bar. Off for showing it in place, as the docs do. */
+  floating?: boolean;
 }
 
 /** A newer Claude Code is out. Floats under the title bar until updated or dismissed. */
-export function CliUpdateNotice({ installed, latest, state, onUpdate, onDismiss }: CliUpdateNoticeProps) {
+export function CliUpdateNotice({ installed, latest, state, onUpdate, onDismiss, floating = true }: CliUpdateNoticeProps) {
   const updating = state.status === "updating";
   return (
-    <section role="status" aria-label="Claude Code update" className={styles.update}>
+    <section role="status" aria-label="Claude Code update" className={styles.update} data-floating={floating || undefined}>
       <div className={styles.updateHead}>
         <Mark size={14} title="" />
         <span className={styles.updateTitle}>Claude Code update</span>

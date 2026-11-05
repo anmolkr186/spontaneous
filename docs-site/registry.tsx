@@ -10,7 +10,8 @@ import { AnnotationDock, RecorderDock } from "@/ui/organisms/dock";
 import type { AnnotationTool, RecordSource, RecorderPhase } from "@/ui/organisms/dock";
 import { AnnotationLayer, Camera, CanvasViewport, Cursor, DeviceFrame } from "@/ui/organisms/stage";
 import { ClipItem, NoteMarker, Timeline, Track, TrackItem, Transport, Waveform } from "@/ui/organisms/timeline";
-import { AgentThread, AskCardView, SuggestionChips } from "@/ui/organisms/agent";
+import { AgentThread, AskCardView, CliUpdateNotice, SuggestionChips } from "@/ui/organisms/agent";
+import type { CliUpdateNoticeProps } from "@/ui/organisms/agent";
 import { AgentRuntimeProvider, useAgentStoreRuntime } from "@/ui/organisms/agent/runtime";
 import type { AgentMessage } from "@/ui/organisms/agent/runtime";
 import { Switch } from "@/ui/base/switch/switch";
@@ -72,6 +73,21 @@ function MenuSelectDemo() {
   const [effort, setEffort] = useState("high");
   const options = [{ value: "low", label: "Low" }, { value: "high", label: "High" }, { value: "max", label: "Max" }];
   return <MenuSelect label="Effort" display={options.find((o) => o.value === effort)!.label} value={effort} options={options} onChange={setEffort} />;
+}
+
+/** Click through a real run: Update takes a moment, then lands. Every third try fails, to show Retry. */
+function UpdateCardDemo() {
+  const [state, setState] = useState<CliUpdateNoticeProps["state"]>({ status: "idle" });
+  const [tries, setTries] = useState(0);
+  const [shown, setShown] = useState(true);
+  const update = () => {
+    setState({ status: "updating" });
+    const attempt = tries + 1;
+    setTries(attempt);
+    setTimeout(() => setState(attempt % 3 === 0 ? { status: "failed", error: "npm ERR! permission denied" } : { status: "updated", version: "2.1.318" }), 1400);
+  };
+  if (!shown) return <Key size="sm" onClick={() => { setShown(true); setState({ status: "idle" }); }}>Show again</Key>;
+  return <CliUpdateNotice floating={false} installed="2.1.316" latest="2.1.318" state={state} onUpdate={update} onDismiss={() => setShown(false)} />;
 }
 
 function SwitcherDemo() {
@@ -488,6 +504,21 @@ export const ENTRIES: DocEntry[] = [
     composedOf: ["Mark", "Key", "Kbd", "Dock material (composer)"],
     whenToUse: ["The Agent tab."],
     whenNot: ["Holding thread state in React. Rust owns it; the runtime mirrors it."],
+  },
+  {
+    id: "update-card", name: "CliUpdateNotice", layer: "Organisms",
+    description: "Offers a newer Claude Code, once per launch. Update runs the CLI's own updater, then checks the version it reports.",
+    demo: () => <UpdateCardDemo />,
+    usage: `<CliUpdateNotice installed="2.1.316" latest="2.1.318" state={state}\n  onUpdate={install} onDismiss={dismiss} />`,
+    source: agentSrc, sourcePath: "src/ui/organisms/agent/index.tsx",
+    props: [
+      { name: "installed / latest", type: "string", description: "Versions as plain numbers, like 2.1.318." },
+      { name: "state", type: "idle | updating | updated | failed", description: "Drives the button and the note. Failed carries the updater's last line." },
+      { name: "floating", type: "boolean", description: "Default true: fixed under the title bar. Off to show it in place." },
+    ],
+    composedOf: ["Mark", "Key", "IconKey", "Dock material"],
+    whenToUse: ["The installed Claude Code is older than the latest release."],
+    whenNot: ["Errors the user didn't cause. A failed version lookup stays silent."],
   },
   {
     id: "ask", name: "AskCard", layer: "Organisms",

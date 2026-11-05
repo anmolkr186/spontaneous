@@ -112,7 +112,8 @@
 .connectError { color: var(--foreground); }
 
 /* ── Claude Code update: a small dock under the title bar ── */
-.update { position: fixed; top: 76px; right: var(--space-3); z-index: 80; display: flex; flex-direction: column; gap: var(--space-2); width: min(288px, calc(100vw - 24px)); padding: var(--space-2) var(--space-3) var(--space-2-5); border-radius: var(--radius-md); background: var(--dock-bg); box-shadow: var(--dock-shadow); animation: updateIn 240ms var(--ease-standard); }
+.update { display: flex; flex-direction: column; gap: var(--space-2); width: min(288px, calc(100vw - 24px)); padding: var(--space-2) var(--space-3) var(--space-2-5); border-radius: var(--radius-md); background: var(--dock-bg); box-shadow: var(--dock-shadow); animation: updateIn 240ms var(--ease-standard); }
+.update[data-floating] { position: fixed; top: 76px; right: var(--space-3); z-index: 80; }
 @keyframes updateIn { from { opacity: 0; transform: translateY(-4px); } }
 .updateHead { display: flex; align-items: center; gap: var(--space-2); margin-right: calc(var(--space-1) * -1); }
 .updateTitle { flex: 1; color: var(--foreground); font-size: var(--text-sm); font-weight: var(--weight-medium); }

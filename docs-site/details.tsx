@@ -4,6 +4,8 @@ import { Mic, MicOff, Monitor, MousePointer2, PenLine, Undo2 } from "lucide-reac
 import { Cell, IconKey, Key, Mark, Tag } from "@/ui/atoms";
 import { NoteCard, SourceKey, Switcher, ToggleKey } from "@/ui/molecules";
 import { DockTool } from "@/ui/organisms/dock";
+import { CliUpdateNotice } from "@/ui/organisms/agent";
+import type { CliUpdateNoticeProps } from "@/ui/organisms/agent";
 import { TooltipPreview } from "@/ui/base/tooltip/tooltip";
 import { mockProject } from "@/editor/model";
 import { MATERIALS, bootStageSVG, runBoot } from "./markStudio";
@@ -22,6 +24,10 @@ export interface Details {
 
 /** Render a child in a forced state (hover, active, focus) for documentation. */
 const Force = ({ state, children }: { state?: "hover" | "active" | "focus"; children: ReactNode }) => <div data-force={state} style={{ display: "inline-flex" }}>{children}</div>;
+
+const UpdateCard = ({ state }: { state: CliUpdateNoticeProps["state"] }) => (
+  <CliUpdateNotice floating={false} installed="2.1.316" latest="2.1.318" state={state} onUpdate={() => {}} onDismiss={() => {}} />
+);
 
 const open = mockProject.notes[0]!;
 const applied = mockProject.notes[1]!;
@@ -257,6 +263,23 @@ export const DETAILS: Record<string, Details> = {
       { input: "← / → (⇧ for 1s)", response: "Steps the playhead a frame or a second." },
       { input: "Click an item", response: "Selects it; zooms also seek to their start." },
       { input: "Delete", response: "Removes the selected item (undoable)." },
+    ],
+  },
+  "update-card": {
+    limit: "One card, one CLI. Four states, and only Update is a primary key.",
+    variants: [
+      { name: "floating", when: "In the app: fixed under the title bar, over the side panel." },
+      { name: "in place", when: "Docs and previews." },
+    ],
+    states: [
+      { name: "Available", note: "Versions and Update", render: () => <UpdateCard state={{ status: "idle" }} /> },
+      { name: "Updating", note: "Key and dismiss disabled", render: () => <UpdateCard state={{ status: "updating" }} /> },
+      { name: "Failed", note: "Updater's last line, Retry", render: () => <UpdateCard state={{ status: "failed", error: "npm ERR! permission denied" }} /> },
+      { name: "Updated", note: "Next message uses it", render: () => <UpdateCard state={{ status: "updated", version: "2.1.318" }} /> },
+    ],
+    interactions: [
+      { input: "Update", response: "Runs `claude update`, then checks the version. A clean exit with the old version counts as failed." },
+      { input: "×", response: "Hides it for this launch. The next launch checks again." },
     ],
   },
   "agent-thread": {
