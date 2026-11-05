@@ -79,26 +79,9 @@
 .middleSwap { flex: 1; gap: var(--space-2); min-width: 0; }
 .escHint { flex: none; color: var(--text-faint); font-size: var(--text-2xs); }
 
-/* The dotted audio trace: columns of dots that scroll left while listening. */
-.trace { flex: 1; min-width: 0; height: 20px; overflow: hidden; color: var(--text-muted); -webkit-mask-image: linear-gradient(90deg, transparent, black 24%, black 82%, transparent); mask-image: linear-gradient(90deg, transparent, black 24%, black 82%, transparent); }
-.traceRun { display: flex; align-items: center; width: max-content; height: 100%; animation: traceScroll 2.6s linear infinite; }
-.traceRun i { flex: none; width: 2px; height: var(--h); margin-right: 3px; background: radial-gradient(circle, currentColor .9px, transparent 1.15px) center top / 2px 3px repeat-y; }
-@keyframes traceScroll { to { translate: -50% 0; } }
-
-/* The microphone while listening: the light face, three calm bars, a ring breathing outwards. */
-.mic { position: relative; }
-.mic[data-listening]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: 0 0 0 1.5px var(--live-dim);
-  pointer-events: none;
-  animation: breathe 2.2s var(--ease-standard) infinite;
-}
-@keyframes breathe { from { opacity: 1; scale: 1; } to { opacity: 0; scale: 1.5; } }
-.mic .micBars { height: 12px; }
-.mic .micBars i { animation-duration: 1300ms; }
+/* A live microphone looks the same everywhere: the Meter in rec beside it, its glyph in rec (as the dock's voice note). */
+.level { display: flex; flex: 1; align-items: center; min-width: 0; padding-left: var(--space-1); color: var(--rec); }
+.mic[data-listening], .mic[data-listening]:hover { color: var(--rec); }
 
 .send .stopGlyph { width: 10px; height: 10px; fill: currentColor; stroke-width: 0; }
 
@@ -136,7 +119,5 @@
 .itemLabel { flex: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-  .traceRun, .mic[data-listening]::after, .word { animation: none; }
-  .mic .micBars i { animation: none; height: 55%; }
-  .mic .micBars i:nth-child(2) { height: 90%; }
+  .word { animation: none; }
 }

@@ -122,6 +122,12 @@
 .meter { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
 .meter i { width: 2px; border-radius: 1px; background: currentColor; animation: meter 900ms var(--ease-in-out) infinite alternate; }
 @keyframes meter { from { height: 20%; } to { height: 100%; } }
+/* Still, but still a level: uneven bars instead of a flat line. */
+@media (prefers-reduced-motion: reduce) {
+  .meter i { animation: none; height: 55%; }
+  .meter i:nth-child(3n + 1) { height: 85%; }
+  .meter i:nth-child(4n + 2) { height: 35%; }
+}
 
 /* ── Forced states (docs previews): [data-force] on an ancestor renders the state statically. ── */
 :global([data-force="hover"]) .key { background: var(--key-bg-hover); }

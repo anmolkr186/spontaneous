@@ -7,11 +7,11 @@
  * chips: a frame or a region at a timecode, one of your notes with its ink pin,
  * a file. Below it, one row: "+" to attach, the model, the microphone and Send.
  *
- * Dictation: the microphone turns into the light face with three calm level
- * bars and a ring breathing outwards. Heard words appear muted in the well and
- * turn to full text once they're confirmed, while a dotted audio trace scrolls
- * beside the controls. Pressing the microphone again keeps the words; Esc
- * throws them away. While the agent runs, Send becomes Stop.
+ * Dictation: the microphone is live the way the annotation dock's voice note
+ * is: its glyph turns rec and the Meter runs beside the controls. Heard words
+ * appear muted in the well and turn to full text once they're confirmed.
+ * Pressing the microphone again keeps the words; Esc throws them away. While
+ * the agent runs, Send becomes Stop.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
@@ -105,8 +105,6 @@ const MENU: { kind: AttachKind; label: string; icon: ReactNode }[] = [
   { kind: "file", label: "File…", icon: <Paperclip /> },
 ];
 
-/** Dot-column heights for the audio trace, in px. The strip repeats twice and scrolls by one copy. */
-const TRACE = [3, 6, 9, 5, 12, 7, 4, 9, 14, 6, 4, 10, 7, 3, 9, 12, 6, 4, 8, 3, 6, 11, 5, 7];
 const WORD_MS = 240;
 const join = (a: string, b: string) => (a && b ? `${a.replace(/\s+$/, "")} ${b.trim()}` : a || b.trim());
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean);
@@ -123,16 +121,6 @@ function Chip({ item, onRemove }: { item: ComposerAttachment; onRemove: () => vo
       {time && item.kind !== "note" && <span className={styles.time}>{time}</span>}
       <button type="button" className={styles.chipRemove} aria-label={`Remove ${name}${time ? ` at ${time}` : ""}`} onClick={onRemove}><X aria-hidden /></button>
     </>
-  );
-}
-
-function Trace() {
-  return (
-    <span className={styles.trace} aria-hidden>
-      <span className={styles.traceRun}>
-        {[...TRACE, ...TRACE].map((h, i) => <i key={i} style={{ "--h": `${h}px` } as CSSProperties} />)}
-      </span>
-    </span>
   );
 }
 
@@ -305,8 +293,8 @@ export function ChatComposer({
         </Menu.Root>
 
         <span className={styles.middle}>
-          <Swap id={isListening ? "trace" : "idle"} inline className={styles.middleSwap}>
-            {isListening ? <><Trace /><span className={styles.escHint}>Esc to discard</span></> : null}
+          <Swap id={isListening ? "level" : "idle"} inline className={styles.middleSwap}>
+            {isListening ? <><span className={styles.level}><Meter bars={16} /></span><span className={styles.escHint}>Esc to discard</span></> : null}
           </Swap>
         </span>
 
@@ -314,9 +302,9 @@ export function ChatComposer({
           onChange={(id) => { setModelState(id); onModelChange?.(id); }}
           thinking={thinking} onThinkingChange={setThinking} effort={effort} onEffortChange={setEffort} />
 
-        <IconKey label={isListening ? "Keep what you said" : "Dictate"} tooltip="top" variant={isListening ? "primary" : "tertiary"}
+        <IconKey label={isListening ? "Keep what you said" : "Dictate"} tooltip="top" variant="tertiary"
           pressed={isListening} className={styles.mic} data-listening={isListening || undefined} onClick={toggleListening}>
-          <Swap id={isListening ? "bars" : "mic"}>{isListening ? <Meter bars={3} className={styles.micBars} /> : <Mic />}</Swap>
+          <Mic />
         </IconKey>
 
         <IconKey label={running ? "Stop" : "Send"} shortcut={running ? undefined : "↵"} tooltip="top" variant={isListening ? "secondary" : "primary"}

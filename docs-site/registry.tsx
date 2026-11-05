@@ -370,7 +370,10 @@ const CORE: Omit<DocEntry, "category">[] = [
     usage: `<span style={{ color: "var(--rec)" }}><Meter /></span>`,
     source: atomsSrc, sourcePath: "src/ui/atoms/index.tsx",
     props: [{ name: "bars", type: "number = 16", description: "Bar count." }],
-    whenToUse: ["While a microphone is live."],
+    whenToUse: [
+      "While a microphone is live, in rec: the annotation dock's voice note, the recorder's microphone, dictation in the chat composer. One look for a live mic everywhere; don't draw a new trace or waveform for it.",
+      "Muted for playing audio back, as in message actions' read-aloud.",
+    ],
   },
 
   /* Molecules */

@@ -10,12 +10,16 @@
  * into a list. A hairline along the bottom runs down with each toast's timer
  * and stops while you read. Swipe a toast sideways, press Esc or its close key
  * to dismiss it.
+ *
+ * The action sits flush right, on the title's line. Close is a small round
+ * key on the slab's corner that shows on hover and focus, so it never takes
+ * room from the action.
  */
 import { isValidElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode, RefObject } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { Info, X } from "lucide-react";
-import { IconKey, Key, StatusGlyph, Swap } from "@/ui/atoms";
+import { Key, StatusGlyph, Swap } from "@/ui/atoms";
 import type { GlyphStatus } from "@/ui/atoms";
 import { motionTokens } from "@/ui/tokens/motion";
 import styles from "./toaster.module.css";
@@ -172,7 +176,8 @@ export interface ToasterProps {
 /** How far each older toast peeks out behind the one in front, and how much smaller it gets. */
 const PEEK = 9;
 const SHRINK = 0.05;
-type Place = { y: number; scale: number; height: number | "auto"; shown: boolean; behind: boolean };
+/** Where a toast goes. `z` keeps the newest on top: older slabs come later in the list and would otherwise paint over it. */
+type Place = { y: number; scale: number; height: number | "auto"; shown: boolean; behind: boolean; z: number };
 
 export function Toaster({
   position = "bottom-right", inline, id, duration = 4000, visibleToasts = 3, expand = false, offset, gap = 10,
@@ -253,9 +258,10 @@ export function Toaster({
     const shown = i < visibleToasts;
     const depth = Math.min(i, visibleToasts - 1);
     const h = heights[t.id];
+    const z = front.length - i;
     const place: Place = open
-      ? { y: away * reach, scale: 1, height: h ?? "auto", shown, behind: false }
-      : { y: away * depth * PEEK, scale: 1 - depth * SHRINK, height: i === 0 ? h ?? "auto" : frontH || "auto", shown, behind: i > 0 };
+      ? { y: away * reach, scale: 1, height: h ?? "auto", shown, behind: false, z }
+      : { y: away * depth * PEEK, scale: 1 - depth * SHRINK, height: i === 0 ? h ?? "auto" : frontH || "auto", shown, behind: i > 0, z };
     if (shown) reach += (h ?? 0) + gap;
     return place;
   });
@@ -343,6 +349,7 @@ function ToastItem({ data: t, domId, place, edge, bottom, held, duration, hairli
   return (
     <motion.li id={domId} tabIndex={0} className={styles.toast} data-kind={t.kind} data-behind={place.behind || undefined} data-edge={bottom ? "bottom" : "top"}
       inert={!place.shown || undefined} onKeyDown={onKeyDown}
+      style={{ zIndex: place.z }}
       custom={swipes.current}
       initial={{ opacity: 0, y: edge * 48, scale: 0.97, filter: `blur(${motionTokens.blur.subtle}px)` }}
       animate={{ opacity: place.shown ? 1 : 0, y: place.y, scale: place.scale, height: place.height, filter: "blur(0px)" }}
@@ -363,20 +370,25 @@ function ToastItem({ data: t, domId, place, edge, bottom, held, duration, hairli
         swipes.current.set(t.id, Math.sign(info.offset.x || info.velocity.x));
         toast.dismiss(t.id);
       }}>
-      <div ref={content} className={styles.content}>
-        <ToastIcon kind={t.kind} />
-        <Swap id={`v${t.version}`} inline={false} className={styles.text}>
-          <span className={styles.title}>{withTimes(t.title)}</span>
-          {t.description && <span className={styles.description}>{withTimes(t.description)}</span>}
-        </Swap>
-        {t.action && (
-          <Swap id={t.action.label} className={styles.action}>
-            <Key size="sm" onClick={(e) => { t.action?.onClick(e); if (!e.defaultPrevented) toast.dismiss(t.id); }}>{t.action.label}</Key>
+      <div className={styles.slab}>
+        <div ref={content} className={styles.content}>
+          <ToastIcon kind={t.kind} />
+          <Swap id={`v${t.version}`} inline={false} className={styles.text}>
+            <span className={styles.title}>{withTimes(t.title)}</span>
+            {t.description && <span className={styles.description}>{withTimes(t.description)}</span>}
           </Swap>
-        )}
-        {closeButton && <IconKey size="sm" label="Close" tooltip={false} className={styles.close} onClick={() => toast.dismiss(t.id)}><X /></IconKey>}
+          {t.action && (
+            <Swap id={t.action.label} className={styles.action}>
+              <Key size="sm" onClick={(e) => { t.action?.onClick(e); if (!e.defaultPrevented) toast.dismiss(t.id); }}>{t.action.label}</Key>
+            </Swap>
+          )}
+        </div>
+        {hairline && timed && <span key={t.version} className={styles.hairline} data-held={held || undefined} style={{ "--life": `${dur}ms` } as CSSProperties} />}
       </div>
-      {hairline && timed && <span key={t.version} className={styles.hairline} data-held={held || undefined} style={{ "--life": `${dur}ms` } as CSSProperties} />}
+      {closeButton && (
+        <button type="button" className={styles.close} aria-label="Close" onClick={() => toast.dismiss(t.id)}
+          onPointerDown={(e) => e.stopPropagation()}><X aria-hidden /></button>
+      )}
     </motion.li>
   );
 }

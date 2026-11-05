@@ -135,9 +135,9 @@ export const entry: DocEntry = {
   ],
   motion: [
     "Attachment chips blur in, rising 3px; the others glide aside on layout, and the row unfolds the first time (grid rows, glide curve).",
-    "Dictating: the microphone becomes the light face with three calm level bars and a ring that breathes outwards every 2.2s.",
-    "Heard words blur in muted and settle into full text once confirmed; a dotted trace scrolls left beside the controls.",
+    "Dictating: the microphone turns rec and the Meter runs beside the controls, the same live-mic look as the annotation dock's voice note.",
+    "Heard words blur in muted and settle into full text once confirmed.",
     "Send and Stop swap with a blur; the \"+\" menu grows out of the key's corner and collapses faster than it opened.",
-    "Reduced motion: words and chips appear in place, the trace and the ring stand still, the bars hold.",
+    "Reduced motion: words and chips appear in place; the Meter holds an uneven, still level.",
   ],
 };
