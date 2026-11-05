@@ -249,7 +249,7 @@ export function ApprovalCard({
                 {denyText}
                 {shortcuts && <span className={styles.hint} aria-hidden><Kbd>Esc</Kbd></span>}
               </Key>
-              <CtaKey intent="decide" risk={RISK[risk ?? "low"].cta} count={count} label={approveText} proposal={proposedPrimary(cta, "decide")}
+              <CtaKey intent="decide" role={resolved ? "secondary" : undefined} risk={RISK[risk ?? "low"].cta} count={count} label={approveText} proposal={proposedPrimary(cta, "decide")}
                 data-action="approve" aria-keyshortcuts="Meta+Enter Control+Enter" loading={busy} onClick={() => void approve()} icon={<Check aria-hidden />}
                 trailing={shortcuts && <span className={cx(styles.hint, styles.collapsible)} aria-hidden><Kbd className={styles.faceKbd}>⌘↵</Kbd></span>} />
             </div>

@@ -256,7 +256,7 @@ export function AgentMonitor({
                         <span className={styles.askHint}><Kbd>↵</Kbd> allow <Kbd>esc</Kbd> decline</span>
                         <TraySpacer />
                         {onDecline && <Key size="sm" variant="tertiary" onClick={onDecline}>Decline</Key>}
-                        {onAllow && <CtaKey size="sm" intent="decide" risk="risky" label={ask?.tool ? approvalLabels(ask.tool).approve : "Allow"} proposal={ask?.label} onClick={onAllow} />}
+                        {onAllow && <CtaKey size="sm" intent="decide" role={waiting && ask ? undefined : "secondary"} risk="risky" label={ask?.tool ? approvalLabels(ask.tool).approve : "Allow"} proposal={ask?.label} onClick={onAllow} />}
                       </div>
                     </div>
                   </Fold>

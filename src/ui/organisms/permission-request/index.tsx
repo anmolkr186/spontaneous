@@ -229,7 +229,7 @@ export function PermissionRequest({
                 <Key variant="tertiary" data-action="deny" aria-keyshortcuts="Escape" onClick={deny}>
                   Deny<span className={styles.hint} aria-hidden><Kbd>Esc</Kbd></span>
                 </Key>
-                <CtaKey intent="decide" risk={risk} label={allowLabel} proposal={chosen === "once" ? proposedPrimary(cta, "decide") : undefined}
+                <CtaKey intent="decide" role={current ? "secondary" : undefined} risk={risk} label={allowLabel} proposal={chosen === "once" ? proposedPrimary(cta, "decide") : undefined}
                   data-action="allow" aria-keyshortcuts="Enter" onClick={allow}
                   trailing={<span className={styles.hint} aria-hidden><Kbd className={cx(!destructive && styles.faceKbd)}>↵</Kbd></span>} />
               </div>

@@ -37,7 +37,7 @@ Any UI tool call may carry `"cta": { "primary": { "label", "intent" }, "secondar
 - Four words and 28 characters at most. Sentence case. No !, ?, … or emoji.
 - A number must match what the action touches: “Apply 3 notes” only when there are 3.
 - Destructive actions name what they destroy (“Overwrite export”, not “Overwrite”); the key turns red on its own.
-- The intent ranks it: decide (approve, allow) > run (start work) > review (accept changes) > apply (take a suggestion) > finish (export) > navigate. Dismiss (Deny, Keep current, Cancel) is never primary.
+- The intent ranks it: decide (approve, allow) > run (start work) > review (accept changes) > apply (take a suggestion) > finish (export) > navigate. Dismiss (Deny, Keep current, Cancel) is never primary. Several asks waiting: the oldest holds the primary, so they're answered in the order you made them.
 - Leave the label out when the derived one already says it: the app writes “Run 5 edits”, “Accept 4 changes”, “Allow for an hour” itself.
 
 | Intent | Good | Turned down |
