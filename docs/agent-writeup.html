@@ -1,0 +1,213 @@
+<title>Spontaneous Agent Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap">
+<style>
+/* Layout: one reading column on the app's graphite, with the agent thread as the single raised object. */
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0b;
+  --panel: #0f0f11;
+  --raised: #1a1a1d;
+  --well: #060607;
+  --line: rgb(255 255 255 / .08);
+  --line-strong: rgb(255 255 255 / .14);
+  --fg: #ececef;
+  --soft: #b4b4bb;
+  --muted: #85858e;
+  --ink: #f0b444;
+  --ink-soft: rgb(240 180 68 / .14);
+  --ok: #8fd3a8;
+  --sans: "Geist", -apple-system, system-ui, sans-serif;
+  --time: "Geist Mono", ui-monospace, "SF Mono", monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--soft);
+  font: 400 16px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+main {
+  max-width: 720px;
+  margin-inline: auto;
+  padding-block: clamp(40px, 8vw, 88px);
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: clamp(44px, 7vw, 68px);
+}
+main > * { min-width: 0; }
+section { display: grid; gap: 16px; }
+section > * { min-width: 0; }
+h1, h2, h3 { margin: 0; color: var(--fg); font-weight: 500; text-wrap: balance; }
+h1 { font-size: clamp(32px, 6vw, 46px); line-height: 1.08; letter-spacing: -.025em; }
+h2 { font-size: 22px; line-height: 1.25; letter-spacing: -.012em; }
+h3 { font-size: 16px; line-height: 1.35; }
+p { margin: 0; max-width: 65ch; }
+ul { margin: 0; padding: 0; list-style: none; }
+
+header { display: grid; gap: 18px; }
+.product { color: var(--fg); font-weight: 500; display: flex; align-items: center; gap: 9px; }
+.cell { width: 10px; height: 10px; background: var(--ink); transform: skewX(-12deg); border-radius: 1.5px; flex: none; }
+.lede { font-size: 19px; line-height: 1.5; color: var(--soft); }
+.byline { color: var(--muted); font-size: 14px; }
+
+code {
+  font: 500 .9em var(--sans);
+  color: var(--fg);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: .05em .4em;
+  overflow-wrap: anywhere;
+}
+
+/* Status */
+.status { display: grid; border-block: 1px solid var(--line); }
+.status > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 16px; padding-block: 16px; }
+.status > div + div { border-top: 1px solid var(--line); }
+.status dt { color: var(--fg); font-weight: 500; }
+.status dd { margin: 0; }
+dl { margin: 0; }
+
+/* Agent thread */
+figure { margin: 0; display: grid; gap: 12px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 65ch; }
+.thread {
+  background: linear-gradient(180deg, #161618, #0f0f11);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .06), 0 18px 50px rgb(0 0 0 / .45);
+  padding: clamp(14px, 3vw, 22px);
+  display: grid;
+  gap: 14px;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.note { justify-self: end; max-width: 88%; background: var(--ink-soft); border: 1px solid rgb(240 180 68 / .28); border-radius: 10px; padding: 10px 12px; color: var(--fg); display: grid; gap: 4px; }
+.note small { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 12.5px; }
+.t { font-family: var(--time); font-variant-numeric: tabular-nums; }
+.reason { color: var(--muted); border-left: 1px solid var(--line-strong); padding-left: 12px; }
+.tool { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; justify-content: space-between; background: var(--well); border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; box-shadow: inset 0 1px 2px rgb(0 0 0 / .6); }
+.tool b { color: var(--fg); font-weight: 500; }
+.tool span { color: var(--muted); font-size: 13px; }
+.tool .undo { color: var(--fg); font-weight: 500; font-size: 13px; background: linear-gradient(180deg, #2a2a2e, #1f1f22); border: 1px solid var(--line-strong); border-radius: 6px; padding: 2px 9px; }
+.reply { color: var(--fg); }
+
+/* Flow */
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.flow li { background: var(--panel); padding: 14px; display: grid; gap: 4px; align-content: start; }
+.flow b { color: var(--fg); font-weight: 500; }
+.flow span { font-size: 14px; line-height: 1.45; }
+
+/* Decisions */
+.decisions { display: grid; gap: 26px; }
+.decisions li { display: grid; gap: 6px; }
+
+/* Tools table */
+.scroll { overflow-x: auto; }
+table { width: 100%; min-width: 480px; border-collapse: collapse; font-size: 15px; }
+th { text-align: left; font-weight: 500; color: var(--fg); padding: 0 16px 10px 0; }
+td { vertical-align: top; padding: 11px 16px 11px 0; border-top: 1px solid var(--line); }
+td:first-child { color: var(--fg); white-space: nowrap; }
+td code { display: inline-block; margin: 0 2px 4px 0; }
+
+.steps { display: grid; gap: 10px; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; counter-increment: s; }
+.steps li::before { content: counter(s); color: var(--ink); font-variant-numeric: tabular-nums; }
+
+footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 18px; }
+
+@media (max-width: 620px) {
+  .flow { grid-template-columns: minmax(0, 1fr); }
+  .status > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .note { max-width: 100%; }
+}
+</style>
+
+<main>
+  <header>
+    <div class="product"><i class="cell" aria-hidden="true"></i>Spontaneous</div>
+    <h1>Designing an agent that edits video through typed tools</h1>
+    <p class="lede">Spontaneous is a macOS app that turns screen recordings into product videos. You leave notes on the frame by drawing, speaking or typing, and an agent turns each note into timeline edits you can review and undo.</p>
+    <p class="byline">Anmol Kumar, designer and builder. November 2026.</p>
+  </header>
+
+  <section>
+    <h2>Where it stands</h2>
+    <dl class="status">
+      <div><dt>Built</dt><dd>The recorder, editor, timeline, shot library, design system and the full agent interface: thread, tool cards, per-edit undo, questions, stop and queueing.</dd></div>
+      <div><dt>Scripted</dt><dd>The agent itself. A stand-in plays runs using the same message shapes the real integration will use, and its edits change the real project state. No model is involved yet.</dd></div>
+      <div><dt>Next</dt><dd>Connecting Claude from the sidebar, the in-app MCP server and the orchestration around them. Export also isn't built yet.</dd></div>
+    </dl>
+  </section>
+
+  <section>
+    <h2>The experience</h2>
+    <p>A note is anchored to a moment and, optionally, a region of the frame. Applying it starts a run in the sidebar, where each tool call appears as its own card. Edits carry an Undo, so you judge the agent's work one change at a time.</p>
+    <figure>
+      <div class="thread" role="img" aria-label="An agent thread: a note asks to blur an email, the agent checks input events, adds a blur overlay with an Undo control, and reports what changed.">
+        <div class="note"><small><span>Note 2</span><span class="t">0:49</span></small>Blur the email in the invite field.</div>
+        <div class="reason">The invite field shows an email between <span class="t">0:48</span> and <span class="t">0:56</span>. A blur over the field's region covers it without cutting the shot.</div>
+        <div class="tool"><b>get_input_events</b><span>Focus: Invite field</span></div>
+        <div class="tool"><b>add_overlay</b><span>Blur, Email</span><span class="undo">Undo</span></div>
+        <div class="reply">Blurred the email in the invite field from <span class="t">0:48</span> to <span class="t">0:56</span>. The blur follows the zoom, so it stays put when the camera moves.</div>
+      </div>
+      <figcaption>The thread's sample run, redrawn for this page. The text comes from the app's script, not from a model.</figcaption>
+    </figure>
+    <ol class="flow" style="margin:0;padding:0;list-style:none">
+      <li><b>Note</b><span>Ink, voice or text, tied to a time and region</span></li>
+      <li><b>Agent</b><span>Reads the project and the frame, then decides on edits</span></li>
+      <li><b>Typed tools</b><span>Each call is validated before it applies</span></li>
+      <li><b>Timeline</b><span>The edit appears live and can be undone</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Design decisions</h2>
+    <ul class="decisions">
+      <li><h3>The agent's only way to act is the tool surface</h3><p>The session allows only the app's own tools, with built-in file and shell tools turned off. That keeps its reach easy to explain: it can change this video project and nothing else on your machine.</p></li>
+      <li><h3>Tools are shaped like the user's vocabulary</h3><p>Tools map to things you can see on the timeline, such as a zoom, a cut or a blur. A tool card therefore reads as a plain edit, and the same names work for people, the agent and the undo history.</p></li>
+      <li><h3>Every write is an undoable command</h3><p>Agent edits go through the same command system as manual edits, tagged with who made them. Undo, audit and conflicts between you and the agent then become one model instead of three features.</p></li>
+      <li><h3>The agent can look and can ask</h3><p><code>render_frame</code> lets it see the actual frame, and <code>ask_user</code> shows a question as choice buttons in the thread. A vague note can get a quick answer instead of a confident wrong edit.</p></li>
+      <li><h3>Control during a run is designed, not implied</h3><p>Notes sent while the agent is busy wait under the thread as Up next. Stop clears the queue and returns unfinished notes to open, while finished edits stay and can still be undone.</p></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>The planned tool surface</h2>
+    <p>The MCP server splits tools into reads, which are free, and writes, which become commands.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Kind</th><th>Tools</th></tr></thead>
+        <tbody>
+          <tr><td>Read</td><td><code>get_project</code><code>get_annotations</code><code>get_timeline_summary</code><code>get_input_events</code><code>render_frame</code><code>list_templates</code></td></tr>
+          <tr><td>Write</td><td><code>add_zoom</code><code>update_zoom</code><code>remove_zoom</code><code>add_overlay</code><code>set_speed</code><code>cut</code><code>trim</code><code>set_template</code><code>set_background</code><code>set_cursor</code></td></tr>
+          <tr><td>Conversation</td><td><code>resolve_annotation</code><code>ask_user</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>What the orchestration will do</h2>
+    <p>The goal is that you connect Claude once from the sidebar and then only think about notes. The app takes care of the rest:</p>
+    <ol class="steps" style="margin:0;padding:0;list-style:none">
+      <li><span>Find Claude Code on your machine and start it with access to the app's tools only.</span></li>
+      <li><span>Turn open notes into runs, and hold the next run while the agent is busy or waiting on your answer.</span></li>
+      <li><span>Stream the agent's output into the thread, showing text, reasoning and tool cards as they arrive.</span></li>
+      <li><span>Show permission requests and questions as choices in the thread, then send your answer back to the agent.</span></li>
+      <li><span>Link each resolved note to the edits that answered it, so those edits can be reverted together.</span></li>
+      <li><span>Clean up agent processes when you stop a run or quit, and remove any left behind on the next launch.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>What I still need to learn</h2>
+    <p>A script never misreads a note, so the interface hasn't yet been tested against a real agent's mistakes. Once Claude is connected, I want to see how people review a run that is partly wrong, and whether tool cards give enough detail to trust an edit without replaying the video. I also expect connection and sign-in failures to need their own design, because they are the first thing a new user could hit.</p>
+  </section>
+
+  <footer>Anmol Kumar. Spontaneous is in active development and isn't publicly released.</footer>
+</main>
