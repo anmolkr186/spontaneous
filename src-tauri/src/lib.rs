@@ -86,6 +86,9 @@ pub fn run() {
       agent::agent_connect,
       agent::agent_send,
       agent::agent_stop,
+      agent::agent_latest_version,
+      agent::agent_update,
+      agent::agent_models,
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application");

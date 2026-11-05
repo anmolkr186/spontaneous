@@ -3,7 +3,7 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { Composer, Message, Thread, When, useThreadState } from "./runtime";
 import type { ReasoningMessagePartComponent, TextMessagePartComponent, ToolCallMessagePartComponent, ToolCallMessagePartProps } from "./runtime";
 import { ArrowUp, Check, ChevronDown, ChevronRight, Circle, Clock3, Crosshair, Eye, Film, Gauge, Minus, Scissors, Search, Square, Type, Wand2, X, ZoomIn } from "lucide-react";
-import { Kbd, Key, Mark } from "@/ui/atoms";
+import { IconKey, Kbd, Key, Mark } from "@/ui/atoms";
 import { formatTime } from "@/editor/model";
 import styles from "./agent.module.css";
 
@@ -90,6 +90,44 @@ export function AgentConnect({ phase, error, onSignIn, onCheck }: AgentConnectPr
         {phase !== "signed-out" && <Key size="sm" variant={phase === "missing" ? "primary" : "tertiary"} onClick={onCheck}>Check again</Key>}
       </div>
     </div>
+  );
+}
+
+export interface CliUpdateNoticeProps {
+  installed: string;
+  latest: string;
+  state: { status: "idle" | "updating" } | { status: "updated"; version: string } | { status: "failed"; error: string };
+  onUpdate: () => void;
+  onDismiss: () => void;
+}
+
+/** A newer Claude Code is out. Floats under the title bar until updated or dismissed. */
+export function CliUpdateNotice({ installed, latest, state, onUpdate, onDismiss }: CliUpdateNoticeProps) {
+  const updating = state.status === "updating";
+  return (
+    <section role="status" aria-label="Claude Code update" className={styles.update}>
+      <div className={styles.updateHead}>
+        <Mark size={14} title="" />
+        <span className={styles.updateTitle}>Claude Code update</span>
+        <IconKey label="Dismiss" size="sm" disabled={updating} onClick={onDismiss}><X /></IconKey>
+      </div>
+      <div className={styles.updateRow}>
+        {state.status === "updated" ? (
+          <span className={styles.updateDone}><Check size={13} />Updated to {state.version}</span>
+        ) : (
+          <>
+            <span className={styles.updateVersions}>{installed} → {latest}</span>
+            <Key size="sm" variant="primary" disabled={updating} onClick={onUpdate}>
+              {updating ? "Updating…" : state.status === "failed" ? "Retry" : "Update"}
+            </Key>
+          </>
+        )}
+      </div>
+      {state.status === "failed" && <p role="alert" className={styles.updateError}>{state.error}</p>}
+      <p className={styles.updateNote}>
+        {state.status === "updated" ? "Your next message runs on the new version." : "New models often need the latest version."}
+      </p>
+    </section>
   );
 }
 

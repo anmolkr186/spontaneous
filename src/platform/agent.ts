@@ -19,6 +19,15 @@ export interface AgentSessionOptions {
   effort: string | null;
 }
 
+/** One model as the installed CLI describes it. `value` is what `--model` takes. */
+export interface AgentModel {
+  value: string;
+  displayName: string;
+  description?: string;
+  supportsEffort?: boolean;
+  supportedEffortLevels?: string[];
+}
+
 export const agent = {
   status: () => call<AgentStatus>("agent_status"),
   /** Opens Anthropic's sign-in page through the CLI. Resolves when the CLI finishes. */
@@ -30,5 +39,11 @@ export const agent = {
     return call<void>("agent_connect", { options, onEvent });
   },
   send: (text: string) => call<void>("agent_send", { text }),
+  /** The models and effort levels the installed CLI supports. Costs no plan usage. */
+  models: () => call<AgentModel[]>("agent_models"),
+  /** The newest Claude Code release. */
+  latestVersion: () => call<string>("agent_latest_version"),
+  /** Runs the CLI's own updater. Check the version afterwards: a clean exit doesn't prove it installed anything. */
+  update: () => call<void>("agent_update"),
   stop: () => call<void>("agent_stop"),
 };

@@ -7,7 +7,7 @@ import { isTauri } from "@/platform/tauri";
 import { SHOTS, shotById } from "./shots";
 import type { Shot } from "./shots";
 import { agent } from "@/platform/agent";
-import type { AgentEvent } from "@/platform/agent";
+import type { AgentEvent, AgentModel } from "@/platform/agent";
 import { AGENT_MODELS, modelName, reduceParts } from "./agent-stream";
 
 /** Read a camera request from plain language. The real agent does this with tools; this is the scripted stand-in. */
@@ -71,6 +71,14 @@ interface AgentState {
   signIn: () => Promise<void>;
   /** Forget the conversation, for a new project. */
   reset: () => void;
+  /** What the installed CLI says it supports. Null until asked, or if it can't say. */
+  catalog: AgentModel[] | null;
+  /** Ask the CLI for its models again, for example after an update. */
+  loadCatalog: () => Promise<void>;
+  /** The installed CLI's version, as `--version` printed it. */
+  cliVersion: string | null;
+  /** Start the next message on a new CLI process, for example after an update. */
+  restartSession: () => void;
   messages: Msg[];
   running: boolean;
   /** Runs waiting their turn, oldest first. They start when the agent is free and not waiting on you. */
@@ -434,9 +442,14 @@ export const useAgent = create<AgentState>((set, get) => {
 
     setModelChoice: (modelChoice) => {
       sessionStale = true;
-      // Until the CLI reports the exact version, show the family that was picked.
-      set({ modelChoice, model: AGENT_MODELS.find((m) => m.value === modelChoice)?.label ?? null });
-      saveChoices({ modelChoice, effortChoice: get().effortChoice });
+      const { catalog } = get();
+      const picked = catalog?.find((m) => m.value === (modelChoice ?? "default"));
+      // Until the CLI reports the model it ran, show the one that was picked.
+      const model = modelChoice ? picked?.displayName ?? AGENT_MODELS.find((m) => m.value === modelChoice)?.label ?? null : null;
+      // An effort the new model doesn't support goes back to its default.
+      const effortChoice = picked && !picked.supportedEffortLevels?.includes(get().effortChoice ?? "") ? null : get().effortChoice;
+      set({ modelChoice, model, effortChoice });
+      saveChoices({ modelChoice, effortChoice });
     },
 
     setEffortChoice: (effortChoice) => {
@@ -449,8 +462,12 @@ export const useAgent = create<AgentState>((set, get) => {
       if (!isTauri) return;
       const status = await agent.status();
       if (!status) return;
+      set({ cliVersion: status.version });
       if (!status.installed) set({ connection: { phase: "missing" } });
-      else if (status.loggedIn) set({ connection: { phase: "ready", plan: status.subscription } });
+      else if (status.loggedIn) {
+        set({ connection: { phase: "ready", plan: status.subscription } });
+        if (!get().catalog) void get().loadCatalog();
+      }
       // A sign-in still open in the browser keeps its card until it finishes.
       else if (get().connection.phase !== "signing-in") set({ connection: { phase: "signed-out" } });
     },
@@ -469,6 +486,20 @@ export const useAgent = create<AgentState>((set, get) => {
       set({ connection: { phase: "checking" } });
       await get().checkConnection();
     },
+
+    catalog: null,
+    loadCatalog: async () => {
+      const catalog = await agent.models().catch(() => undefined);
+      if (!catalog?.length) return;
+      set({ catalog });
+      // A saved choice the CLI no longer offers falls back to its default.
+      const { modelChoice, effortChoice } = get();
+      if (modelChoice && !catalog.some((m) => m.value === modelChoice)) get().setModelChoice(null);
+      const levels = catalog.find((m) => m.value === (get().modelChoice ?? "default"))?.supportedEffortLevels ?? [];
+      if (effortChoice && !levels.includes(effortChoice)) get().setEffortChoice(null);
+    },
+    cliVersion: null,
+    restartSession: () => { sessionStale = true; },
 
     reset: () => {
       get().cancel();

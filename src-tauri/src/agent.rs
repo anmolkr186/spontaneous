@@ -35,6 +35,11 @@ You have no tools in this version, so you can't read the project or change the t
 claim you made an edit. When given notes, say in one sentence each what edit you would make \
 (zoom, callout, blur, cut, or speed), and ask one question if a note is ambiguous. Keep replies short.";
 
+/// Every Claude Code release is published to npm, however it was installed.
+const RELEASES_URL: &str = "https://registry.npmjs.org/@anthropic-ai/claude-code/latest";
+/// A download, and for npm installs a full dependency install.
+const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
+
 const BATCH_INTERVAL: Duration = Duration::from_millis(16);
 const STOP_GRACE: Duration = Duration::from_secs(2);
 const STDERR_LINES: usize = 20;
@@ -272,6 +277,117 @@ pub fn agent_stop(state: State<'_, AgentState>) {
   }
 }
 
+/// How long the CLI gets to answer the model question before the probe gives up.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Asks the installed CLI which models and effort levels it supports, through
+/// the `initialize` request the Agent SDK sends. It makes no model request, so
+/// it costs nothing, and new models appear without an app update.
+fn probe_models(path: &Path, cwd: &Path) -> Result<Value, String> {
+  let mut child = cli(path)
+    .args([
+      "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+      "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence",
+    ])
+    .current_dir(cwd)
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null())
+    .spawn()
+    .map_err(|e| format!("Couldn't start Claude Code: {e}"))?;
+  let mut stdin = child.stdin.take().ok_or("Claude Code has no stdin")?;
+  let stdout = child.stdout.take().ok_or("Claude Code has no stdout")?;
+  let request = json!({ "type": "control_request", "request_id": "models", "request": { "subtype": "initialize" } });
+  writeln!(stdin, "{request}").and_then(|_| stdin.flush()).map_err(|e| e.to_string())?;
+
+  let (tx, rx) = mpsc::channel::<Value>();
+  std::thread::spawn(move || {
+    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+      let Ok(event) = serde_json::from_str::<Value>(&line) else { continue };
+      if event["type"] == "control_response" && event["response"]["request_id"] == "models" {
+        let _ = tx.send(event["response"]["response"]["models"].clone());
+        break;
+      }
+    }
+  });
+  let models = rx.recv_timeout(PROBE_TIMEOUT);
+  drop(stdin);
+  let _ = child.kill();
+  let _ = child.wait();
+  match models {
+    Ok(models) if models.is_array() => Ok(models),
+    Ok(_) => Err("This Claude Code doesn't list its models".to_string()),
+    Err(_) => Err("Claude Code didn't answer in time".to_string()),
+  }
+}
+
+#[tauri::command]
+pub async fn agent_models(app: AppHandle) -> Result<Value, String> {
+  let path = find_cli().ok_or("Claude Code isn't installed")?;
+  let cwd = app.path().app_data_dir().map_err(|e| e.to_string())?.join("agent");
+  std::fs::create_dir_all(&cwd).map_err(|e| e.to_string())?;
+  tauri::async_runtime::spawn_blocking(move || probe_models(&path, &cwd)).await.map_err(|e| e.to_string())?
+}
+
+/// The newest Claude Code on npm. Fetched with the system curl, so the app needs no HTTP client.
+#[tauri::command]
+pub async fn agent_latest_version() -> Result<String, String> {
+  tauri::async_runtime::spawn_blocking(|| {
+    let output = Command::new("/usr/bin/curl")
+      .args(["-fsSL", "--max-time", "10", "-A", "Spontaneous", "-H", "Accept: application/json", RELEASES_URL])
+      .stdin(Stdio::null())
+      .output()
+      .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+      return Err("Couldn't reach the npm registry".to_string());
+    }
+    let body: Value = serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
+    latest_version(&body).ok_or_else(|| "The npm registry returned no version".to_string())
+  }).await.map_err(|e| e.to_string())?
+}
+
+fn latest_version(body: &Value) -> Option<String> {
+  body["version"].as_str().map(str::trim).filter(|v| !v.is_empty()).map(str::to_string)
+}
+
+/// Runs the CLI's own updater, which knows whether it came from the native
+/// installer, npm or Homebrew. stdin is closed, so an updater that stops to ask
+/// fails instead of hanging. Exiting cleanly doesn't prove it installed
+/// anything, so the caller checks the version afterwards.
+#[tauri::command]
+pub async fn agent_update() -> Result<(), String> {
+  let path = find_cli().ok_or("Claude Code isn't installed")?;
+  tauri::async_runtime::spawn_blocking(move || {
+    let child = cli(&path)
+      .arg("update")
+      .stdin(Stdio::null())
+      .stdout(Stdio::piped())
+      .stderr(Stdio::piped())
+      .spawn()
+      .map_err(|e| format!("Couldn't start the update: {e}"))?;
+    let pid = child.id();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || { let _ = tx.send(child.wait_with_output()); });
+    match rx.recv_timeout(UPDATE_TIMEOUT) {
+      Ok(Ok(output)) if output.status.success() => Ok(()),
+      Ok(Ok(output)) => Err(update_failure(&output.stdout, &output.stderr)),
+      Ok(Err(e)) => Err(e.to_string()),
+      Err(_) => {
+        let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+        Err("The update took too long and was stopped".to_string())
+      }
+    }
+  }).await.map_err(|e| e.to_string())?
+}
+
+/// Updaters print their reason on either stream, and the last line says what went wrong.
+fn update_failure(stdout: &[u8], stderr: &[u8]) -> String {
+  [stderr, stdout]
+    .iter()
+    .find_map(|bytes| String::from_utf8_lossy(bytes).lines().map(str::trim).rfind(|l| !l.is_empty()).map(str::to_string))
+    .unwrap_or_else(|| "The update failed".to_string())
+}
+
 /// A child also exits when its stdin closes, so a crash here can't leave one behind.
 pub fn shutdown(app: &AppHandle) {
   let state = app.state::<AgentState>();
@@ -287,6 +403,30 @@ pub fn shutdown(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  #[ignore = "uses the real CLI"]
+  fn lists_models_with_their_effort_levels() {
+    let models = probe_models(&find_cli().expect("claude is installed"), &std::env::temp_dir()).unwrap();
+    let models = models.as_array().unwrap();
+    assert!(models.iter().any(|m| m["value"] == "default"));
+    assert!(models.iter().all(|m| m["displayName"].is_string()));
+    assert!(models.iter().any(|m| m["supportedEffortLevels"].as_array().is_some_and(|l| !l.is_empty())));
+  }
+
+  #[test]
+  fn reads_the_version_from_the_registry() {
+    assert_eq!(latest_version(&json!({ "name": "@anthropic-ai/claude-code", "version": "2.1.318" })), Some("2.1.318".into()));
+    assert_eq!(latest_version(&json!({ "version": " " })), None);
+    assert_eq!(latest_version(&json!({})), None);
+  }
+
+  #[test]
+  fn reports_the_last_line_an_updater_printed() {
+    assert_eq!(update_failure(b"checking\n", b"npm ERR! code EACCES\nnpm ERR! permission denied\n\n"), "npm ERR! permission denied");
+    assert_eq!(update_failure(b"no write access\n", b""), "no write access");
+    assert_eq!(update_failure(b"", b""), "The update failed");
+  }
 
   /// Sends one real message on the signed-in plan. Run with `cargo test -p spontaneous --lib agent -- --ignored`.
   #[test]

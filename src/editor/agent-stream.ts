@@ -38,7 +38,10 @@ export function reduceParts(content: Part[], event: AgentEvent): Part[] {
   return content;
 }
 
-/** The CLI's aliases follow the latest version, so the menus don't name versions. */
+/**
+ * Used only when the installed CLI can't list its own models, as in the browser
+ * preview. The aliases follow the latest version, so they don't name one.
+ */
 export const AGENT_MODELS = [
   { value: "default", label: "Default" },
   { value: "fable", label: "Fable" },
@@ -47,6 +50,7 @@ export const AGENT_MODELS = [
   { value: "haiku", label: "Haiku" },
 ];
 
+/** The fallback effort levels, for the same case. */
 export const AGENT_EFFORTS = [
   { value: "default", label: "Default" },
   { value: "low", label: "Low" },
@@ -55,6 +59,13 @@ export const AGENT_EFFORTS = [
   { value: "xhigh", label: "Extra high" },
   { value: "max", label: "Max" },
 ];
+
+const EFFORT_LABELS: Record<string, string> = { xhigh: "Extra high" };
+
+/** Levels the CLI names but this app hasn't seen get their name capitalized. */
+export function effortLabel(level: string): string {
+  return EFFORT_LABELS[level] ?? level.charAt(0).toUpperCase() + level.slice(1);
+}
 
 /** "claude-opus-5-5" reads as "Opus 5.5". Anything else is shown as it came. */
 export function modelName(id: string): string {

@@ -12,7 +12,7 @@ import { AnnotationLayer, Callout, Camera, CanvasViewport, Cursor, DeviceFrame, 
 import type { DeviceKind } from "@/ui/organisms/stage";
 import { AnnotationDock, Dock, DockDivider, DockTool } from "@/ui/organisms/dock";
 import { ClipItem, NoteMarker, Timeline, Track, TrackItem, Transport, Waveform, fitPps } from "@/ui/organisms/timeline";
-import { AgentConnect, AgentEmpty, AgentQueue, AgentThread, SuggestionChips } from "@/ui/organisms/agent";
+import { AgentConnect, AgentEmpty, AgentQueue, AgentThread, CliUpdateNotice, SuggestionChips } from "@/ui/organisms/agent";
 import { AgentRuntimeProvider, useAgentStoreRuntime } from "@/ui/organisms/agent/runtime";
 import type { AgentMessage, AppendMessage } from "@/ui/organisms/agent/runtime";
 import { capture } from "@/platform/capture";
@@ -25,7 +25,8 @@ import type { Aspect, BackdropSet, Project } from "./model";
 import { activeZoom, useEditor } from "./store";
 import type { EditorMode, InspectorTab } from "./store";
 import { useAgent } from "./agent";
-import { AGENT_EFFORTS, AGENT_MODELS } from "./agent-stream";
+import { useAgentUpdate } from "./agent-update";
+import { AGENT_EFFORTS, AGENT_MODELS, effortLabel } from "./agent-stream";
 import { cursorAtTime, projectFromRecording } from "./recording";
 import styles from "./editor.module.css";
 
@@ -51,6 +52,7 @@ export function Editor() {
         {mode === "studio" && <Inspector />}
         <Stage />
         <SidePanel />
+        <AgentUpdate />
         {mode === "studio" ? <TimelinePanel /> : !previewing && <ScrubBar />}
       </div>
     </AgentRuntimeProvider>
@@ -687,21 +689,42 @@ function AgentConversation() {
   );
 }
 
-/** Model and effort for the next message. The labels stay short so both fit beside the send key. */
+/** Offers a newer Claude Code once per launch, after the connection check finds the installed one. */
+function AgentUpdate() {
+  const version = useAgent((s) => s.cliVersion);
+  const available = useAgentUpdate((s) => s.available);
+  const state = useAgentUpdate((s) => s.state);
+  const { check, install, dismiss } = useAgentUpdate.getState();
+  useEffect(() => { if (version) void check(version); }, [version, check]);
+  if (!available) return null;
+  return <CliUpdateNotice installed={available.installed} latest={available.latest} state={state} onUpdate={install} onDismiss={dismiss} />;
+}
+
+/**
+ * Model and effort for the next message, as the installed Claude Code lists
+ * them, so new models and levels show up without an app update. The fixed
+ * lists are only for a CLI that can't say.
+ */
 function AgentChoices() {
   const model = useAgent((s) => s.model);
+  const catalog = useAgent((s) => s.catalog);
   const modelChoice = useAgent((s) => s.modelChoice);
   const effortChoice = useAgent((s) => s.effortChoice);
-  const { setModelChoice, setEffortChoice } = useAgent.getState();
-  const effort = AGENT_EFFORTS.find((e) => e.value === effortChoice);
-  const picked = AGENT_MODELS.find((m) => m.value === modelChoice);
   const plan = useAgent((s) => (s.connection.phase === "ready" ? s.connection.plan : null));
+  const { setModelChoice, setEffortChoice } = useAgent.getState();
+  const current = catalog?.find((m) => m.value === (modelChoice ?? "default"));
+  const models = catalog ? catalog.map((m) => ({ value: m.value, label: m.displayName })) : AGENT_MODELS;
+  const efforts = current ? [{ value: "default", label: "Default" }, ...(current.supportedEffortLevels ?? []).map((l) => ({ value: l, label: effortLabel(l) }))] : AGENT_EFFORTS;
+  const showEffort = current ? current.supportsEffort !== false && !!current.supportedEffortLevels?.length : true;
+  const picked = models.find((m) => m.value === modelChoice);
   return (
     <>
-      <MenuSelect label="Model" display={model ?? picked?.label ?? "Default model"} value={modelChoice ?? "default"} options={AGENT_MODELS}
+      <MenuSelect label="Model" display={model ?? picked?.label ?? "Default model"} value={modelChoice ?? "default"} options={models}
         onChange={(v) => setModelChoice(v === "default" ? null : v)} />
-      <MenuSelect label="Effort" display={effort ? effort.label : "Default effort"} hint={effort ? undefined : "Uses the model's own default"} value={effortChoice ?? "default"} options={AGENT_EFFORTS}
-        onChange={(v) => setEffortChoice(v === "default" ? null : v)} />
+      {showEffort && (
+        <MenuSelect label="Effort" display={effortChoice ? effortLabel(effortChoice) : "Default effort"} hint={effortChoice ? undefined : "Uses the model's own default"}
+          value={effortChoice ?? "default"} options={efforts} onChange={(v) => setEffortChoice(v === "default" ? null : v)} />
+      )}
       {plan && <Tag size="sm" title={`Runs on your Claude ${plan} plan`}>{plan.charAt(0).toUpperCase() + plan.slice(1)}</Tag>}
     </>
   );
