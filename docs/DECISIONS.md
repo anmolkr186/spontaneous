@@ -49,8 +49,9 @@ Nothing open right now.
   - Done in one display layer, `docs-site/naming.ts`.
 - **Docs group components by job** (2026-11-06)
   - Chat, Agent, Editing, Inputs, Feedback, Primitives, under one collapsible Components dropdown. The layer (atom, molecule, organism) is a tag.
-- **No Workbench section in the docs** (2026-11-06)
-  - Removed after the byline alignment was decided. Design specimens live on the relevant Foundations page instead (e.g. Actions).
+- **The docs keep a Workbench section** (2026-11-07)
+  - Workbench pages lay design options side by side; a decided page stays as the record of what was picked and why, with the chosen option tagged "In use". It was removed on 2026-11-06 and brought back at the user's request.
+  - Byline alignment lives there (variant 1, the hanging tray, is in use). Live specimens of shipped rules stay on their Foundations page (e.g. Actions).
 - **Mono only for time** (2026-10-30)
   - Timecodes, durations and clocks. Never tool names, JSON or counts; arguments show as labelled rows.
 
