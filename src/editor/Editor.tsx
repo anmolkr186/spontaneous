@@ -8,7 +8,7 @@ import { ScrubInput } from "@/ui/base/scrub-input/scrub-input";
 import { Cell, IconKey, Key, Mark, Tag, Timecode } from "@/ui/atoms";
 import { Field, Group, Hint, MenuSelect, NoteCard, Panel, SwatchPicker, Switcher } from "@/ui/molecules";
 import { EXTRA_TONES, ScreenArt, ShotCard, ShotScene, standInTone } from "@/ui/organisms/shot";
-import { AnnotationLayer, Callout, Camera, CanvasViewport, Cursor, DeviceFrame, VideoScreen, stageStyles, useElementSize } from "@/ui/organisms/stage";
+import { AnnotationLayer, Callout, Camera, CanvasViewport, Cursor, DeviceFrame, ScreenCorners, VideoScreen, stageStyles, useElementSize } from "@/ui/organisms/stage";
 import type { DeviceKind } from "@/ui/organisms/stage";
 import { AnnotationDock, Dock, DockDivider, DockTool } from "@/ui/organisms/dock";
 import { ClipItem, NoteMarker, Timeline, Track, TrackItem, Transport, Waveform, fitPps } from "@/ui/organisms/timeline";
@@ -18,10 +18,11 @@ import type { AgentMessage, AppendMessage } from "@/ui/organisms/agent/runtime";
 import { capture } from "@/platform/capture";
 import type { RecordingSummary } from "@/platform/capture";
 import { call, isTauri } from "@/platform/tauri";
-import { BACKGROUNDS, backdrop, formatTime } from "./model";
+import { BACKGROUNDS, backdrop, formatTime, pinNumbers } from "./model";
 import { PRIMITIVES, SHOTS, SHOT_SETS, poseAt, shotById, shotLength } from "./shots";
 import type { Shot, ShotSet } from "./shots";
-import type { Aspect, BackdropSet, Project } from "./model";
+import type { Aspect, BackdropSet, Project, Rect } from "./model";
+import { canvasToRecording, measureQuad } from "./space";
 import { activeZoom, useEditor } from "./store";
 import type { EditorMode, InspectorTab } from "./store";
 import { useAgent } from "./agent";
@@ -454,21 +455,25 @@ function ClipStage() {
   const shot = shotById(project.template);
   const flat = shot.device === "browser" || shot.device === "window";
   const device: DeviceKind = shot.device === "window" ? "window" : "browser";
-  // Everything that lives on the screen: footage, cursor, overlays, your ink.
-  const screenContent = (
+  const nearby = project.notes.filter((n) => Math.abs(n.at - time) < 2.5);
+  const pins = pinNumbers(project.notes);
+  const openPin = (id: string) => { select(id); setSide("notes"); };
+  const camera = { scale: zoom?.scale ?? 1, target: zoom?.target ?? { x: 0.5, y: 0.5 } };
+  // What belongs to the footage, in recording space: the video, cursor and overlays.
+  const footage = (
     <>
       <VideoScreen src={recording.videoSrc} time={time} playing={playing} />
       {cursor.x >= 0 && <Cursor x={cursor.x} y={cursor.y} size={project.cursor.size} clicking={project.cursor.clickRipple && cursor.clicking} />}
       <AnimatePresence>
         {overlays.filter((o) => o.kind === "callout").map((o) => <Callout key={o.id} x={0.56} y={0.24}>{o.label}</Callout>)}
       </AnimatePresence>
-      <AnnotationLayer
-        notes={project.notes.filter((n) => Math.abs(n.at - time) < 2.5)}
-        tool={tool}
-        draft={draft}
-        onDraft={setDraft}
-        onPinClick={(id) => { select(id); setSide("notes"); }}
-      />
+    </>
+  );
+  // Notes from before canvas-space notes stay on the recording, on the main screen only.
+  const screenContent = (
+    <>
+      {footage}
+      <AnnotationLayer notes={nearby.filter((n) => n.space !== "canvas")} tool="pointer" numbers={pins} onPinClick={openPin} />
     </>
   );
 
@@ -495,7 +500,8 @@ function ClipStage() {
               timeLabel={formatTime(time)}
               hasDraft={!!draft}
               onSubmit={(text, voice) => {
-                const id = addNote({ at: time, text, intents: draft?.region ? ["zoom"] : [], region: draft?.region, ink: draft?.ink, voice });
+                const onRecording = draft?.screen;
+                const id = addNote({ at: time, text, intents: onRecording ? ["zoom"] : [], space: "canvas", region: draft?.region, ink: draft?.ink, screen: onRecording, voice });
                 setDraft(null);
                 setTool("pointer");
                 select(id);
@@ -506,9 +512,9 @@ function ClipStage() {
         }
       >
         {flat ? (
-          <Camera scale={zoom?.scale ?? 1} target={zoom?.target ?? { x: 0.5, y: 0.5 }}>
+          <Camera {...camera}>
             <DeviceFrame kind={device} padding={project.frame.padding} radius={project.frame.radius} shadow={project.frame.shadow} contentAspect={recording.width / recording.height}>
-              {screenContent}
+              <RecordingScreen main>{screenContent}</RecordingScreen>
             </DeviceFrame>
           </Camera>
         ) : (
@@ -517,12 +523,57 @@ function ClipStage() {
             shot={shot}
             background={project.background}
             pose={poseAt(shot, time - project.span.start, project.motion)}
-            screen={<Camera scale={zoom?.scale ?? 1} target={zoom?.target ?? { x: 0.5, y: 0.5 }}><div style={{ position: "absolute", inset: 0 }}>{screenContent}</div></Camera>}
+            screen={<RecordingScreen main camera={camera}>{screenContent}</RecordingScreen>}
+            // The other screens in Tile Stack and Infinite Wall: the same footage, so marks on them land on the recording too.
+            extraScreens={[0, 1].map((i) => <RecordingScreen key={i} camera={camera}>{footage}</RecordingScreen>)}
           />
         )}
+        {/* Your marks, over the whole canvas: on the recording or the backdrop around it. */}
+        <AnnotationLayer
+          notes={nearby.filter((n) => n.space === "canvas")}
+          tool={tool}
+          draft={draft}
+          onDraft={setDraft}
+          numbers={pins}
+          onPinClick={openPin}
+          locate={locateOnRecording}
+        />
       </CanvasViewport>
     </div>
   );
+}
+
+const fill = { position: "absolute", inset: 0 } as const;
+
+/**
+ * One screen showing the recording, with corner markers so a mark on the
+ * canvas can be mapped onto the footage. With `camera` (the 3D shots) zooms
+ * happen inside the screen, which then crops them; flat shots zoom the whole
+ * canvas around it instead.
+ */
+function RecordingScreen({ main, camera, children }: { main?: boolean; camera?: { scale: number; target: { x: number; y: number } }; children: ReactNode }) {
+  if (!camera) return <div data-screen={main ? "main" : ""} style={fill}>{children}<ScreenCorners of="recording" /></div>;
+  return (
+    <div data-screen={main ? "main" : ""} style={fill}>
+      <ScreenCorners of="window" />
+      <Camera {...camera}><div style={fill}>{children}<ScreenCorners of="recording" /></div></Camera>
+    </div>
+  );
+}
+
+/**
+ * Where a region drawn on the canvas lands on the recording: through the
+ * screen under the region's center (the front one, in shots with several),
+ * else the main screen. Undefined when it's only on the backdrop.
+ */
+function locateOnRecording(region: Rect, layer: HTMLElement): Rect | undefined {
+  const c = layer.getBoundingClientRect();
+  const under = document.elementsFromPoint(c.left + (region.x + region.w / 2) * c.width, c.top + (region.y + region.h / 2) * c.height)
+    .map((el) => el.closest("[data-screen]")).find((el) => el && layer.parentElement?.contains(el));
+  const screen = under ?? layer.parentElement?.querySelector("[data-screen=main]");
+  const recording = measureQuad(screen?.querySelector("[data-of=recording]") ?? null, layer);
+  if (!recording) return undefined;
+  return canvasToRecording({ recording, window: measureQuad(screen!.querySelector(":scope > [data-of=window]"), layer) }, region);
 }
 
 /** The preview's own clock: plays from the start whenever the shot changes, and loops over the span. */

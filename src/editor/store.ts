@@ -27,7 +27,7 @@ interface EditorState {
   /** Timeline zoom: 1 fits the whole project into the timeline's width, 12 is twelve times closer. */
   zoomLevel: number;
   /** Ink drawn on the frame that has not been attached to a note yet. */
-  draft: { ink?: string; region?: Note["region"] } | null;
+  draft: Pick<Note, "ink" | "region" | "screen"> | null;
   setDraft: (draft: EditorState["draft"]) => void;
 
   seek: (t: Seconds) => void;

@@ -196,34 +196,43 @@ export function Cursor({ x, y, size = 1, clicking }: { x: number; y: number; siz
 
 /* ───────────────────────── Annotations ───────────────────────── */
 
+type Draft = Pick<Note, "ink" | "region" | "screen">;
+
 export interface AnnotationLayerProps {
   notes: Note[];
   tool: "pointer" | "pen" | "region";
-  draft: { ink?: string; region?: Note["region"] } | null;
-  onDraft: (draft: { ink?: string; region?: Note["region"] }) => void;
+  draft?: Draft | null;
+  onDraft?: (draft: Draft) => void;
   onPinClick?: (id: string) => void;
+  /** Pin numbers by note id; defaults to the order of `notes`. */
+  numbers?: Record<string, number>;
+  /** Where a region drawn on this layer lands on the recording, stored with the draft as `screen`. */
+  locate?: (region: NonNullable<Note["region"]>, layer: HTMLElement) => Note["screen"];
 }
 
 /**
- * Ink, regions and pins drawn above the canvas in normalized frame coordinates,
- * so they stay attached to the frame at any size. With the pen or region tool
- * active, pointer input draws a draft that the dock turns into a note.
+ * Ink, regions and pins drawn in normalized coordinates of the box the layer
+ * fills, so they stay attached to it at any size. On the stage that box is the
+ * whole canvas, backdrop included. With the pen or region tool active, pointer
+ * input draws a draft that the dock turns into a note.
  */
-export function AnnotationLayer({ notes, tool, draft, onDraft, onPinClick }: AnnotationLayerProps) {
+export function AnnotationLayer({ notes, tool, draft = null, onDraft, onPinClick, numbers, locate }: AnnotationLayerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const points = useRef<[number, number][]>([]);
   const [live, setLive] = useState<string | null>(null);
   const [liveRegion, setLiveRegion] = useState<Note["region"] | null>(null);
 
+  const clamp = (v: number) => Math.min(100, Math.max(0, v));
   const toLocal = (e: ReactPointerEvent) => {
     const r = ref.current!.getBoundingClientRect();
-    return [((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100] as [number, number];
+    return [clamp(((e.clientX - r.left) / r.width) * 100), clamp(((e.clientY - r.top) / r.height) * 100)] as [number, number];
   };
   const pathOf = (pts: [number, number][]) => pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
   const regionOf = (a: [number, number], b: [number, number]) => ({
     x: Math.min(a[0], b[0]) / 100, y: Math.min(a[1], b[1]) / 100,
     w: Math.abs(a[0] - b[0]) / 100, h: Math.abs(a[1] - b[1]) / 100,
   });
+  const commit = (d: Draft) => onDraft?.(d.region && locate ? { ...d, screen: locate(d.region, ref.current!) } : d);
 
   const onPointerDown = (e: ReactPointerEvent) => {
     if (tool === "pointer") return;
@@ -246,10 +255,10 @@ export function AnnotationLayer({ notes, tool, draft, onDraft, onPinClick }: Ann
     const end = toLocal(e);
     if (tool === "pen" && points.current.length > 2) {
       const xs = points.current.map((p) => p[0]), ys = points.current.map((p) => p[1]);
-      onDraft({ ink: pathOf(points.current), region: regionOf([Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]) });
+      commit({ ink: pathOf(points.current), region: regionOf([Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]) });
     } else if (tool === "region") {
       const region = regionOf(start, end);
-      if (region.w > 0.01 && region.h > 0.01) onDraft({ region });
+      if (region.w > 0.01 && region.h > 0.01) commit({ region });
     }
     points.current = [];
     setLive(null);
@@ -269,22 +278,34 @@ export function AnnotationLayer({ notes, tool, draft, onDraft, onPinClick }: Ann
       </svg>
       {draft?.region && !draft.ink && region(draft.region, "draft")}
       {liveRegion && region(liveRegion, "live")}
-      {notes.filter((n) => n.region && n.status !== "dismissed").map((n, i) => (
-        <Tooltip key={n.id} content={`Note ${i + 1}`} description={n.text} side="top">
-          <button
-            type="button"
-            className={styles.pin}
-            data-status={n.status}
-            aria-label={`Note ${i + 1}: ${n.text}`}
-            style={{ left: `${n.region!.x * 100}%`, top: `${(n.region!.y + n.region!.h / 2) * 100}%` }}
-            onClick={() => onPinClick?.(n.id)}
-          >
-            {i + 1}
-          </button>
-        </Tooltip>
-      ))}
+      {notes.filter((n) => n.region && n.status !== "dismissed").map((n, i) => {
+        const number = numbers?.[n.id] ?? i + 1;
+        return (
+          <Tooltip key={n.id} content={`Note ${number}`} description={n.text} side="top">
+            <button
+              type="button"
+              className={styles.pin}
+              data-status={n.status}
+              aria-label={`Note ${number}: ${n.text}`}
+              style={{ left: `${n.region!.x * 100}%`, top: `${(n.region!.y + n.region!.h / 2) * 100}%` }}
+              onClick={() => onPinClick?.(n.id)}
+            >
+              {number}
+            </button>
+          </Tooltip>
+        );
+      })}
     </div>
   );
+}
+
+/**
+ * Four invisible markers at the corners of the box it fills. The stage reads
+ * them back after every transform to learn where that box lands on the canvas
+ * (src/editor/space.ts `measureQuad`). `of` names the box, to find it again.
+ */
+export function ScreenCorners({ of }: { of: string }) {
+  return <span className={styles.corners} data-of={of} aria-hidden><i /><i /><i /><i /></span>;
 }
 
 /** A callout bubble rendered at a normalized position on the frame. */
