@@ -14,6 +14,10 @@ Nothing open right now.
   - The agent UI catalog relies on tools the server doesn't serve yet: `propose_plan`, `propose_text_edit`, `request_permission`, `try_variants`, `suggest_shot`, `answer_with_moments`, `reply_to_note`. `ask_user` and `resolve_annotation` exist.
   - Each tool may carry an optional `cta` field, with labels checked by `src/ui/cta/validate.ts`.
   - Spec: `docs/AGENT_UI.md` (generated from `src/ui/agent-ui/catalog.ts`). Build these with the MCP server in phase 4 (`docs/ARCHITECTURE.md` §7).
+- **Sign and notarize with the personal Developer ID** (2026-11-06, waiting on the membership)
+  - Builds are signed with an Apple Development certificate on the CrowdPad team (`K2Z889W2SW`), where the user is only a Developer, and aren't notarized. They should move to the user's own paid team.
+  - Waiting on: the personal Apple Developer Program membership showing up in the developer.apple.com team list, with the user as Account Holder. `9RWC9A2UWQ` is the free Personal Team and can't notarize.
+  - Then: the user creates a Developer ID Application certificate in Xcode on that team and runs `xcrun notarytool store-credentials spontaneous-notary --apple-id … --team-id <team>` themselves. After that, `scripts/package-macos.sh` notarizes and staples the DMG with `--keychain-profile spontaneous-notary`, and the build skill's TeamIdentifier check changes to the new team. Screen recording permission will need granting once more.
 - **Agent pieces the app can't do yet** (2026-11-06)
   - `cut`, `set_speed` and `trim` aren't store commands, so plan steps using them fail honestly with Retry (`src/editor/apply.ts` `NOT_YET`). The prompt tells the agent not to propose them.
   - Dictation: the composer's voice key is off in the app (`voice={false}`) until there's real speech input.
