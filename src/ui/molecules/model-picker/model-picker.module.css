@@ -14,8 +14,10 @@ button.trigger[data-size] { gap: 0; padding: 0 var(--space-1-5) 0 var(--space-2)
 .group > button[data-size] { height: calc(var(--control-height-sm) - 2px); }
 .groupRule { width: 1px; height: 12px; background: var(--border-subtle); }
 button.harnessKey[data-size] { gap: 0; padding: 0 var(--space-1) 0 var(--space-1-5); }
-.harnessIcon { display: grid; place-items: center; color: var(--foreground); }
+/* The marks take the picker's grey, the same as the model name, and brighten with it. */
+.harnessIcon { display: grid; place-items: center; color: var(--text-secondary); transition: color var(--duration-instant); }
 .harnessIcon svg { width: 14px; height: 14px; }
+.harnessKey:hover .harnessIcon, .harnessKey[data-state="open"] .harnessIcon { color: var(--foreground); }
 
 .harnessMenu {
   z-index: 80;
@@ -34,7 +36,7 @@ button.harnessKey[data-size] { gap: 0; padding: 0 var(--space-1) 0 var(--space-1
 .harnessMenu[data-state="closed"] { animation: menuOut var(--collapse-duration) var(--ease-collapse) forwards; }
 .harnessItem { display: grid; grid-template-columns: 16px minmax(0, 1fr) 14px; align-items: center; column-gap: var(--space-2); min-height: 36px; padding: var(--space-1-5) var(--space-2-5); border-radius: var(--radius-key); outline: none; cursor: default; }
 .harnessItem[data-highlighted] { background: var(--pressed); }
-.harnessItem .harnessIcon { color: var(--text-muted); }
+.harnessItem .harnessIcon { color: var(--text-secondary); }
 .harnessItem[data-highlighted] .harnessIcon, .harnessItem[data-state="checked"] .harnessIcon { color: var(--foreground); }
 
 /* ── Menu ────────────────────────────────────────────────────────
