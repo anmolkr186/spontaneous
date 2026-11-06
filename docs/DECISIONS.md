@@ -14,10 +14,14 @@ Nothing open right now.
   - The agent UI catalog relies on tools the server doesn't serve yet: `propose_plan`, `propose_text_edit`, `request_permission`, `try_variants`, `suggest_shot`, `answer_with_moments`, `reply_to_note`. `ask_user` and `resolve_annotation` exist.
   - Each tool may carry an optional `cta` field, with labels checked by `src/ui/cta/validate.ts`.
   - Spec: `docs/AGENT_UI.md` (generated from `src/ui/agent-ui/catalog.ts`). Build these with the MCP server in phase 4 (`docs/ARCHITECTURE.md` §7).
-- **Wire the new agent components into the editor** (2026-10-30, reaffirmed 2026-11-06)
-  - The 26 agent components live in the library and docs only. The editor's agent panel still uses the original thread parts.
-  - Wire them component by component, following the "Choosing" rules in `docs/AGENT_UI.md`.
-  - Already wired: CTA regions, the Notes Apply key, the suggestion chip, Send, and Export.
+- **Sign and notarize with the personal Developer ID** (2026-11-06, waiting on the membership)
+  - Builds are signed with an Apple Development certificate on the CrowdPad team (`K2Z889W2SW`), where the user is only a Developer, and aren't notarized. They should move to the user's own paid team.
+  - Waiting on: the personal Apple Developer Program membership showing up in the developer.apple.com team list, with the user as Account Holder. `9RWC9A2UWQ` is the free Personal Team and can't notarize.
+  - Then: the user creates a Developer ID Application certificate in Xcode on that team and runs `xcrun notarytool store-credentials spontaneous-notary --apple-id … --team-id <team>` themselves. After that, `scripts/package-macos.sh` notarizes and staples the DMG with `--keychain-profile spontaneous-notary`, and the build skill's TeamIdentifier check changes to the new team. Screen recording permission will need granting once more.
+- **Agent pieces the app can't do yet** (2026-11-06)
+  - `cut`, `set_speed` and `trim` aren't store commands, so plan steps using them fail honestly with Retry (`src/editor/apply.ts` `NOT_YET`). The prompt tells the agent not to propose them.
+  - Dictation: the composer's voice key is off in the app (`voice={false}`) until there's real speech input.
+  - Context window: figures are estimates where the CLI doesn't report them, and Compact sends `/compact`, which hasn't been checked against the CLI in stream-json mode.
 - **Remove the fixed label props** (2026-11-06)
   - `approveLabel`, `denyLabel` (ApprovalCard) and `action.label` (CitedAnswer) stay as aliases for one release, then go. Labels come from `tool`, `count`, `edits` and `cta`.
 - **Promote the duplicated helpers** (2026-11-06)
@@ -81,7 +85,26 @@ Nothing open right now.
   - The dev server serves it (`scripts/dev-recordings.ts`, serve only, with byte ranges for seeking). It's not in the built app. `?recording=latest`, a capture's name, or `none` picks another.
   - The sample is a made-up app drawn by `scripts/make-sample-recording.mjs`, so it holds nothing personal and can be regenerated.
 
+### Annotations
+- **Notes are drawn on the whole canvas, not only on the recording** (2026-11-06)
+  - Pins, regions and ink live in canvas space: 0–1 of the output frame, backdrop included, in every shot. So you can mark the space around a window or a laptop, for a title or a callout.
+  - Zoom targets, the cursor, clicks and callouts stay in recording space. Each new note also stores `screen`, the part of its region on the recording, measured on the frame it was drawn on through the shot's transform (`src/editor/space.ts`). Zooms aim there. A mark only on the backdrop has no `screen` and no zoom intent.
+  - In Tile Stack and Infinite Wall every screen is the recording; a mark maps through the screen under it, front first.
+  - Notes saved before this have no `space` field and stay in recording space: they still render on the recording, where they were made. No migration, because moving them to canvas space would depend on the shot and the moment.
+  - The agent reads both spaces by name: "frame x … y … w … h …, on the recording at …" or "on the backdrop, off the recording" (`noteArea` and `AREA_LEGEND` in `src/editor/model.ts`).
+  - Chosen over migrating old notes, and over keeping annotations inside the recording with a separate backdrop layer.
+
 ### Agent
+- **The agent components are wired into the editor's agent panel** (2026-11-06)
+  - Thread parts, the Chat composer, Model picker, Agent steering, Agent monitor, Toaster, the ⌘K Command menu, a Changes tab (Agent ledger and Agent checkpoints) and the Context window, following the Choosing rules in `docs/AGENT_UI.md`.
+- **Until the MCP tools exist, the live agent brings up components with UI blocks in its reply** (2026-11-06)
+  - A fenced ```` ```spontaneous <tool> ```` block holding the tool's JSON becomes a tool-call part of the same shape an MCP tool will produce, so moving to real tools only changes the trigger. Parser: `src/editor/agent-stream.ts`, tested against real CLI captures (`npm run test:agent`).
+  - The system prompt is generated from the catalog (`scripts/agent-prompt.ts` → `src-tauri/src/agent_prompt.txt`, embedded by `agent.rs`), so what the agent is told and what the app parses can't drift.
+  - Answers go back as a short line plus `<spontaneous-answer tool id>{json}</spontaneous-answer>`.
+- **The app applies agent-proposed edits only when the person runs them** (2026-11-06)
+  - Plan steps go through the store's undoable commands, are recorded in the ledger, and save a checkpoint. The Autonomy dial decides which steps ask first: always, only risky ones (`set_shot`, `remove_zoom`), or none.
+- **The built app can play a demo run** (2026-11-06)
+  - From the agent panel's ⋯ menu or ⌘K. It's scripted (`src/editor/demo-run.ts`), never calls Claude Code, and shows every block component, applying real edits.
 - **The agent is the user's Claude Code CLI over stream-json, acting only through our MCP tools** (2026-10-30)
   - `docs/ARCHITECTURE.md` §7.
 - **The agent UI catalog is the single source for which component renders which moment of a run** (2026-11-06)

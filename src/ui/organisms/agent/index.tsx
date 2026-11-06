@@ -1,13 +1,22 @@
 import { createContext, useContext, useState } from "react";
-import type { PropsWithChildren, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Composer, Message, Thread, When, useThreadState } from "./runtime";
-import type { ReasoningMessagePartComponent, TextMessagePartComponent, ToolCallMessagePartComponent, ToolCallMessagePartProps } from "./runtime";
-import { ArrowUp, Check, ChevronDown, ChevronRight, Circle, Clock3, Crosshair, Eye, Film, Gauge, Minus, Scissors, Search, Square, Type, Wand2, X, ZoomIn } from "lucide-react";
+import type { ReasoningMessagePartComponent, TextMessagePartComponent, ToolCallMessagePartComponent } from "./runtime";
+import { ArrowUp, Check, ChevronDown, ChevronRight, Circle, Clock3, Minus, Square, X } from "lucide-react";
 import { IconKey, Kbd, Key, Mark, RollText } from "@/ui/atoms";
 import { useCtaRole } from "@/ui/cta";
 import type { CtaIntent } from "@/ui/cta";
 import { formatTime } from "@/editor/model";
+import { visibleText } from "@/editor/agent-stream";
+import { ThinkingLoader } from "@/ui/molecules/thinking-loader";
+import { MessageActions } from "@/ui/molecules/message-actions";
+import { toast } from "@/ui/organisms/toaster";
+import { AgentActionsContext, BLOCK_RENDERERS, ToolGroupPart, ToolPart, block } from "./parts";
+import type { AgentActions } from "./parts";
 import styles from "./agent.module.css";
+
+export { AgentActionsContext };
+export type { AgentActions };
 
 /* ───────────────────────── Thread ───────────────────────── */
 
@@ -23,6 +32,12 @@ export interface AgentThreadProps {
   tools?: Record<string, ToolCallMessagePartComponent>;
   /** Reverts one edit. Steps whose result carries `undo` get an Undo action. */
   onUndo?: (toolCallId: string) => void;
+  /** Replaces the built-in composer, e.g. with a Chat composer wired to the app. */
+  composer?: ReactNode;
+  /** Sits between the thread and the suggestions, e.g. the Agent monitor or Agent steering. */
+  above?: ReactNode;
+  /** What parts can do in the app: seek, undo by entry, regenerate, open a note. */
+  actions?: AgentActions;
 }
 
 const UndoContext = createContext<((toolCallId: string) => void) | undefined>(undefined);
@@ -35,8 +50,9 @@ const UndoContext = createContext<((toolCallId: string) => void) | undefined>(un
  * A reply reads top to bottom as: reasoning (collapsed), the steps it took on
  * one rail, then the result in plain text. A batch of notes adds a checklist.
  */
-export function AgentThread({ suggestions, queue, empty, composerMeta, tools, onUndo }: AgentThreadProps) {
+export function AgentThread({ suggestions, queue, empty, composerMeta, tools, onUndo, composer, above, actions }: AgentThreadProps) {
   return (
+    <AgentActionsContext.Provider value={{ undo: onUndo, ...actions }}>
     <UndoContext.Provider value={onUndo}>
       <Thread.Root className={styles.thread}>
         <Thread.Viewport className={styles.viewport} turnAnchor="bottom">
@@ -46,12 +62,14 @@ export function AgentThread({ suggestions, queue, empty, composerMeta, tools, on
           </Thread.Messages>
           <Thread.ViewportFooter className={styles.footer}>
             {queue}
+            {above}
             {suggestions}
-            <AgentComposer meta={composerMeta} />
+            {composer ?? <AgentComposer meta={composerMeta} />}
           </Thread.ViewportFooter>
         </Thread.Viewport>
       </Thread.Root>
     </UndoContext.Provider>
+    </AgentActionsContext.Provider>
   );
 }
 
@@ -178,28 +196,47 @@ export function AssistantMessage({ tools }: { tools?: Record<string, ToolCallMes
         {stopped && <span className={styles.stopped}>Stopped</span>}
       </div>
       <div className={styles.assistantBody}>
-        {running && empty && <span className={styles.placeholder}><span className={styles.shimmer}>Thinking</span></span>}
+        {running && empty && <ThinkingLoader variant="plain" size="sm" phases={["Thinking", "Reading your notes", "Writing"]} interval={2600} />}
         <Message.Parts
           components={{
             Text: AgentText,
             Reasoning: AgentReasoning,
-            ToolGroup: Steps,
-            tools: { by_name: { ask_user: AskCard, apply_notes: NotesPlan, ...tools }, Fallback: StepRow },
+            ToolGroup: ToolGroupPart,
+            tools: { by_name: { ask_user: AskBlock, apply_notes: NotesPlan, ...BLOCK_RENDERERS, ...tools }, Fallback: ToolPart },
           }}
         />
+        <ReplyActions />
       </div>
     </Message.Root>
   );
 }
 
-export const AgentText: TextMessagePartComponent = ({ text, status }) => (
-  <p className={[styles.text, status.type === "running" ? styles.cursorBlink : ""].join(" ")}>{text}</p>
-);
+/** Streamed text. A UI block's opening fence still arriving is held back, so it never flashes. */
+export const AgentText: TextMessagePartComponent = ({ text, status }) => {
+  const shown = status.type === "running" ? visibleText(text) : text;
+  if (!shown) return null;
+  return <p className={[styles.text, status.type === "running" ? styles.cursorBlink : ""].join(" ")}>{shown}</p>;
+};
+
+/** Under a finished reply: copy, ask again (on the latest), and rate it. */
+function ReplyActions() {
+  const { regenerate } = useContext(AgentActionsContext);
+  const done = useThreadState((s) => s.message.status?.type === "complete");
+  const text = useThreadState((s) => s.message.content.map((p) => (p.type === "text" ? p.text : "")).join("\n").trim());
+  const last = useThreadState((s) => s.thread.messages.at(-1)?.id === s.message.id);
+  if (!done || !text) return null;
+  return (
+    <MessageActions text={text} label="Reply actions" actions={last && regenerate ? ["copy", "regenerate", "feedback"] : ["copy", "feedback"]}
+      onCopy={() => toast("Copied")} onRegenerate={regenerate} />
+  );
+}
 
 /** Collapsed thinking. Shimmers while streaming; opens on click to a quoted block. */
 export const AgentReasoning: ReasoningMessagePartComponent = ({ text, status }) => {
   const [open, setOpen] = useState(false);
   const running = status.type === "running";
+  // Claude Code can open a thinking block and leave it empty; there's nothing to show.
+  if (!running && !text.trim()) return null;
   return (
     <div className={styles.reasoning}>
       <button type="button" className={styles.reasoningToggle} aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -207,57 +244,6 @@ export const AgentReasoning: ReasoningMessagePartComponent = ({ text, status }) 
         <ChevronRight />
       </button>
       {open && <div className={styles.reasoningText}>{text}</div>}
-    </div>
-  );
-};
-
-/* ───────────────────────── Steps ───────────────────────── */
-
-/** Consecutive tool calls share one rail, so a run reads as a single list of steps. */
-function Steps({ children }: PropsWithChildren<{ startIndex: number; endIndex: number }>) {
-  return <div className={styles.steps}>{children}</div>;
-}
-
-const TOOL_META: Record<string, { title: string; doing: string; icon: ReactNode; kind: "read" | "edit" }> = {
-  get_project: { title: "Read the project", doing: "Reading the project", icon: <Search />, kind: "read" },
-  get_input_events: { title: "Read clicks and focus", doing: "Reading clicks and focus", icon: <Crosshair />, kind: "read" },
-  render_frame: { title: "Looked at the frame", doing: "Looking at the frame", icon: <Eye />, kind: "read" },
-  add_zoom: { title: "Added a zoom", doing: "Adding a zoom", icon: <ZoomIn />, kind: "edit" },
-  update_zoom: { title: "Adjusted a zoom", doing: "Adjusting a zoom", icon: <ZoomIn />, kind: "edit" },
-  remove_zoom: { title: "Removed an auto zoom", doing: "Removing an auto zoom", icon: <ZoomIn />, kind: "edit" },
-  add_overlay: { title: "Added an overlay", doing: "Adding an overlay", icon: <Type />, kind: "edit" },
-  set_speed: { title: "Changed speed", doing: "Changing speed", icon: <Gauge />, kind: "edit" },
-  cut: { title: "Cut a section", doing: "Cutting a section", icon: <Scissors />, kind: "edit" },
-  set_shot: { title: "Changed the shot", doing: "Changing the shot", icon: <Film />, kind: "edit" },
-  set_motion: { title: "Retuned the camera", doing: "Retuning the camera", icon: <Gauge />, kind: "edit" },
-};
-
-function summarize(name: string, args: Record<string, unknown>): string {
-  const t = (v: unknown) => (typeof v === "number" ? formatTime(v) : String(v));
-  if ("start" in args && "end" in args) {
-    const extra = name === "add_zoom" ? ` · ${args.scale}×` : name === "set_speed" ? ` · ${args.speed}×` : "label" in args ? ` · ${args.label}` : "";
-    return `${t(args.start)}–${t(args.end)}${extra}`;
-  }
-  if ("from" in args && "to" in args) return `${t(args.from)}–${t(args.to)}`;
-  if (name === "set_shot") return String(args.shot);
-  if (name === "set_motion") return `${args.speed}× speed · ${Math.round(Number(args.amount) * 100)}% movement`;
-  return "";
-}
-
-/** One step: what the agent read or changed. Edits can be undone from here. */
-export const StepRow: ToolCallMessagePartComponent = ({ toolName, toolCallId, args, result }: ToolCallMessagePartProps) => {
-  const onUndo = useContext(UndoContext);
-  const meta = TOOL_META[toolName] ?? { title: toolName.replace(/_/g, " "), doing: toolName.replace(/_/g, " "), icon: <Wand2 />, kind: "edit" as const };
-  const done = result !== undefined;
-  const r = result as { undo?: unknown; undone?: boolean } | undefined;
-  return (
-    <div className={styles.step} data-kind={meta.kind} data-done={done || undefined} data-undone={r?.undone || undefined}>
-      <span className={styles.stepIcon}>{done ? meta.icon : <span className={styles.spinner} />}</span>
-      <span className={styles.stepTitle}>{done ? meta.title : `${meta.doing}…`}</span>
-      <span className={styles.stepArgs}>{summarize(toolName, (args ?? {}) as Record<string, unknown>)}</span>
-      {r?.undone ? <span className={styles.undone}>Undone</span>
-        : done && r?.undo && onUndo ? <button type="button" className={styles.undo} onClick={() => onUndo(toolCallId)}>Undo</button>
-        : null}
     </div>
   );
 };
@@ -345,6 +331,11 @@ export function AskCardView({ question, options, answer, onAnswer }: AskArgs & {
 export const AskCard: ToolCallMessagePartComponent<AskArgs, { answer: string }> = ({ args, result, addResult }) => (
   <AskCardView question={args.question} options={args.options} answer={result?.answer} onAnswer={(answer) => addResult({ answer })} />
 );
+
+/** ask_user as the thread renders it: a loader while the agent writes the question. */
+const AskBlock = block<Partial<AskArgs>>(({ args, result, answer }) => (
+  <AskCardView question={args.question ?? ""} options={Array.isArray(args.options) ? args.options : []} answer={result?.answer as string | undefined} onAnswer={(o) => answer({ answer: o })} />
+));
 
 /* ───────────────────────── Composer ───────────────────────── */
 

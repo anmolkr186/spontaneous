@@ -8,7 +8,7 @@ const initialProject = isTauri ? { ...mockProject, name: "New project", folder: 
 import type { BackgroundId, Note, Overlay, Project, Seconds, TemplateId, Zoom } from "./model";
 
 export type InspectorTab = "template" | "style" | "cursor" | "motion" | "audio";
-export type SideTab = "agent" | "notes";
+export type SideTab = "agent" | "notes" | "changes";
 export type DockTool = "pointer" | "pen" | "region";
 /** Lite: stage, notes and the agent. Studio: adds the inspector and the full timeline. */
 export type EditorMode = "lite" | "studio";
@@ -27,7 +27,7 @@ interface EditorState {
   /** Timeline zoom: 1 fits the whole project into the timeline's width, 12 is twelve times closer. */
   zoomLevel: number;
   /** Ink drawn on the frame that has not been attached to a note yet. */
-  draft: { ink?: string; region?: Note["region"] } | null;
+  draft: Pick<Note, "ink" | "region" | "screen"> | null;
   setDraft: (draft: EditorState["draft"]) => void;
 
   seek: (t: Seconds) => void;

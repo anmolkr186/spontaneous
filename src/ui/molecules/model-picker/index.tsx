@@ -44,7 +44,9 @@ export interface PickerModel {
   pricePerM?: number;
 }
 
-export type Effort = "low" | "medium" | "high";
+/** A thinking effort level, one of `efforts`' values. The CLI may offer more than the three defaults. */
+export type Effort = string;
+export interface EffortOption { value: Effort; label: string }
 
 /** The models Spontaneous's agent can run on. Auto picks per edit. */
 export const CLAUDE_MODELS: PickerModel[] = [
@@ -54,7 +56,7 @@ export const CLAUDE_MODELS: PickerModel[] = [
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", short: "Haiku 5.5", description: "Quick trims and single zooms", speed: 5, quality: 3, cost: 1, latencyMs: 350, pricePerM: 0.5 },
 ];
 
-const EFFORTS: { value: Effort; label: string }[] = [
+const EFFORTS: EffortOption[] = [
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
@@ -79,6 +81,8 @@ export interface ModelPickerProps {
   defaultThinking?: boolean;
   /** Called when the thinking switch flips. */
   onThinkingChange?: (on: boolean) => void;
+  /** The effort levels to offer, as the CLI names them. Defaults to low, medium and high. */
+  efforts?: EffortOption[];
   /** Thinking effort (controlled). The control only shows while thinking is on. */
   effort?: Effort;
   /** Starting effort. */
@@ -111,7 +115,7 @@ function Segments({ value = 0 }: { value?: number }) {
 
 export function ModelPicker({
   models = CLAUDE_MODELS, value, defaultValue, onChange, thinking, defaultThinking = false, onThinkingChange,
-  effort, defaultEffort = "medium", onEffortChange, open, defaultOpen = false, onOpenChange, side = "bottom", align = "start", className,
+  effort, defaultEffort = "medium", onEffortChange, efforts = EFFORTS, open, defaultOpen = false, onOpenChange, side = "bottom", align = "start", className,
 }: ModelPickerProps) {
   const uid = useId();
   const reduce = useReducedMotion();
@@ -174,8 +178,8 @@ export function ModelPicker({
     const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
     if (!step) return;
     e.preventDefault();
-    const i = EFFORTS.findIndex((o) => o.value === currentEffort);
-    const next = EFFORTS[Math.min(EFFORTS.length - 1, Math.max(0, i + step))]!;
+    const i = efforts.findIndex((o) => o.value === currentEffort);
+    const next = efforts[Math.min(efforts.length - 1, Math.max(0, i + step))]!;
     setEffort(next.value);
     requestAnimationFrame(() => effortRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
   };
@@ -238,7 +242,7 @@ export function ModelPicker({
             <Fold open={isThinking}>
               <div ref={effortRef} className={styles.setting} onKeyDown={onEffortKey}>
                 <span className={styles.settingName}>Effort</span>
-                <Switcher label="Effort" options={EFFORTS} value={currentEffort} onChange={setEffort} />
+                <Switcher label="Effort" options={efforts} value={currentEffort} onChange={setEffort} />
               </div>
             </Fold>
           </div>

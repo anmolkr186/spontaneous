@@ -18,6 +18,15 @@
         "source ~/.nvm/nvm.sh >/dev/null && nvm use 26.13.0 >/dev/null && npx vite --port 1430 --strictPort"
       ],
       "port": 1430
+    },
+    {
+      "name": "app-1440",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "source ~/.nvm/nvm.sh >/dev/null && nvm use 26.13.0 >/dev/null && npx vite --port 1440 --strictPort"
+      ],
+      "port": 1440
     }
   ]
 }

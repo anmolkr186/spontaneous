@@ -111,3 +111,14 @@
 .primitive { display: grid; grid-template-columns: 62px 1fr auto; align-items: center; gap: var(--space-2); height: 26px; padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--well-bg); box-shadow: var(--well-shadow); color: var(--text-muted); font-size: var(--text-xs); }
 .primitive b { color: var(--foreground); font-weight: var(--weight-medium); }
 .primitive .mono { font-size: 10px; }
+
+/* ── Changes tab ─────────────────────────────────────────────── */
+.changes { display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; overflow-y: auto; padding: var(--space-3) var(--space-4) var(--space-6); scrollbar-width: thin; }
+
+/* ── ⌘K ──────────────────────────────────────────────────────── */
+.paletteOverlay { position: fixed; inset: 0; z-index: 60; background: rgb(0 0 0 / .35); animation: fade var(--reveal-duration) var(--ease-reveal); }
+.palette { position: fixed; top: 14vh; left: 50%; z-index: 61; width: min(600px, calc(100vw - 32px)); translate: -50% 0; transform-origin: top center; animation: paletteIn var(--reveal-duration) var(--ease-reveal); }
+.palette:focus { outline: none; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes paletteIn { from { opacity: 0; scale: .97; filter: blur(var(--blur-soft)); } }
+@media (prefers-reduced-motion: reduce) { .paletteOverlay, .palette { animation: none; } }

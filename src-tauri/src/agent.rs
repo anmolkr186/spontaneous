@@ -28,12 +28,10 @@ const BLOCKED_ENV: &[&str] = &[
   "CLAUDE_CODE_ENTRYPOINT",
 ];
 
-/// There are no edit tools yet, so the agent must not claim to have made one.
-const SYSTEM_PROMPT: &str = "You are the editing agent inside Spontaneous, a macOS app that turns \
-screen recordings into product videos through notes pinned to a time and a region of the frame. \
-You have no tools in this version, so you can't read the project or change the timeline. Never \
-claim you made an edit. When given notes, say in one sentence each what edit you would make \
-(zoom, callout, blur, cut, or speed), and ask one question if a note is ambiguous. Keep replies short.";
+/// The agent has no tools: it brings up components with UI blocks in its replies,
+/// and edits only through plans the person runs. Generated from the agent UI
+/// catalog by `npm run docs:agent-ui`; never edit the text file by hand.
+const SYSTEM_PROMPT: &str = include_str!("agent_prompt.txt");
 
 /// Every Claude Code release is published to npm, however it was installed.
 const RELEASES_URL: &str = "https://registry.npmjs.org/@anthropic-ai/claude-code/latest";
@@ -403,6 +401,15 @@ pub fn shutdown(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn tells_the_agent_every_ui_block() {
+    for tool in ["propose_plan", "ask_user", "suggest_shot", "propose_text_edit", "answer_with_moments",
+      "request_approval", "request_permission", "try_variants", "reply_to_note"] {
+      assert!(SYSTEM_PROMPT.contains(&format!("{tool}:")), "the prompt doesn't describe {tool}");
+    }
+    assert!(SYSTEM_PROMPT.contains("```spontaneous"));
+  }
 
   #[test]
   #[ignore = "uses the real CLI"]

@@ -16,8 +16,9 @@
     "preversion": "test \"$(git branch --show-current)\" = main && npm run typecheck",
     "version": "node scripts/sync-version.mjs && git add Cargo.toml Cargo.lock",
     "postversion": "git push --follow-tags",
-    "docs:agent-ui": "node scripts/agent-ui-doc.ts",
-    "test:cta": "node --test scripts/cta.test.ts"
+    "docs:agent-ui": "node scripts/agent-ui-doc.ts && node scripts/agent-prompt.ts",
+    "test:cta": "node --test scripts/cta.test.ts",
+    "test:agent": "node --test scripts/agent-stream.test.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.32",

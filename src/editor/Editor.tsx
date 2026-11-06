@@ -5,28 +5,32 @@ import { ChevronDown, Clapperboard, Film, PanelLeftClose, PanelLeftOpen, PanelRi
 import { Slider } from "@/ui/base/slider/slider";
 import { Switch } from "@/ui/base/switch/switch";
 import { ScrubInput } from "@/ui/base/scrub-input/scrub-input";
-import { Cell, IconKey, Key, Mark, Tag, Timecode } from "@/ui/atoms";
-import { Field, Group, Hint, MenuSelect, NoteCard, Panel, SwatchPicker, Switcher } from "@/ui/molecules";
+import { Cell, IconKey, Key, Mark, Timecode } from "@/ui/atoms";
+import { Field, Group, Hint, NoteCard, Panel, SwatchPicker, Switcher } from "@/ui/molecules";
 import { EXTRA_TONES, ScreenArt, ShotCard, ShotScene, standInTone } from "@/ui/organisms/shot";
-import { AnnotationLayer, Callout, Camera, CanvasViewport, Cursor, DeviceFrame, VideoScreen, stageStyles, useElementSize } from "@/ui/organisms/stage";
+import { AnnotationLayer, Callout, Camera, CanvasViewport, Cursor, DeviceFrame, ScreenCorners, VideoScreen, stageStyles, useElementSize } from "@/ui/organisms/stage";
 import type { DeviceKind } from "@/ui/organisms/stage";
 import { AnnotationDock, Dock, DockDivider, DockTool } from "@/ui/organisms/dock";
 import { ClipItem, NoteMarker, Timeline, Track, TrackItem, Transport, Waveform, fitPps } from "@/ui/organisms/timeline";
-import { AgentConnect, AgentEmpty, AgentQueue, AgentThread, CliUpdateNotice, SuggestionChips } from "@/ui/organisms/agent";
+import { AgentConnect, AgentEmpty, AgentThread, CliUpdateNotice, SuggestionChips } from "@/ui/organisms/agent";
+import { Toaster } from "@/ui/organisms/toaster";
 import { AgentRuntimeProvider, useAgentStoreRuntime } from "@/ui/organisms/agent/runtime";
 import type { AgentMessage, AppendMessage } from "@/ui/organisms/agent/runtime";
 import { capture } from "@/platform/capture";
 import type { RecordingSummary } from "@/platform/capture";
 import { call, isTauri } from "@/platform/tauri";
-import { BACKGROUNDS, backdrop, formatTime } from "./model";
+import { BACKGROUNDS, backdrop, formatTime, pinNumbers } from "./model";
 import { PRIMITIVES, SHOTS, SHOT_SETS, poseAt, shotById, shotLength } from "./shots";
 import type { Shot, ShotSet } from "./shots";
-import type { Aspect, BackdropSet, Project } from "./model";
+import type { Aspect, BackdropSet, Project, Rect } from "./model";
+import { canvasToRecording, measureQuad } from "./space";
 import { activeZoom, useEditor } from "./store";
 import type { EditorMode, InspectorTab } from "./store";
 import { useAgent } from "./agent";
 import { useAgentUpdate } from "./agent-update";
-import { AGENT_EFFORTS, AGENT_MODELS, effortLabel } from "./agent-stream";
+import { AgentAbove, AgentComposerBar, AgentMenu, useAgentActions } from "./agent-panel";
+import { ChangesPane } from "./ChangesPane";
+import { CommandPalette } from "./CommandPalette";
 import { CtaKey, CtaRegion, CtaRoot, exportLabel, notesLabel } from "@/ui/cta";
 import { cursorAtTime, projectFromRecording } from "./recording";
 import styles from "./editor.module.css";
@@ -58,6 +62,8 @@ export function Editor() {
         <AgentUpdate />
         {mode === "studio" ? <TimelinePanel /> : !previewing && <ScrubBar />}
       </div>
+      <Toaster position="bottom-left" />
+      <CommandPalette />
       </CtaRoot>
     </AgentRuntimeProvider>
   );
@@ -110,7 +116,7 @@ function useAgentRuntime() {
     },
     onCancel: async () => useAgent.getState().cancel(),
     onAddToolResult: ({ toolCallId, result }) => {
-      useAgent.getState().answer(toolCallId, (result as { answer: string }).answer);
+      useAgent.getState().answer(toolCallId, result);
     },
   });
 }
@@ -454,21 +460,25 @@ function ClipStage() {
   const shot = shotById(project.template);
   const flat = shot.device === "browser" || shot.device === "window";
   const device: DeviceKind = shot.device === "window" ? "window" : "browser";
-  // Everything that lives on the screen: footage, cursor, overlays, your ink.
-  const screenContent = (
+  const nearby = project.notes.filter((n) => Math.abs(n.at - time) < 2.5);
+  const pins = pinNumbers(project.notes);
+  const openPin = (id: string) => { select(id); setSide("notes"); };
+  const camera = { scale: zoom?.scale ?? 1, target: zoom?.target ?? { x: 0.5, y: 0.5 } };
+  // What belongs to the footage, in recording space: the video, cursor and overlays.
+  const footage = (
     <>
       <VideoScreen src={recording.videoSrc} time={time} playing={playing} />
       {cursor.x >= 0 && <Cursor x={cursor.x} y={cursor.y} size={project.cursor.size} clicking={project.cursor.clickRipple && cursor.clicking} />}
       <AnimatePresence>
         {overlays.filter((o) => o.kind === "callout").map((o) => <Callout key={o.id} x={0.56} y={0.24}>{o.label}</Callout>)}
       </AnimatePresence>
-      <AnnotationLayer
-        notes={project.notes.filter((n) => Math.abs(n.at - time) < 2.5)}
-        tool={tool}
-        draft={draft}
-        onDraft={setDraft}
-        onPinClick={(id) => { select(id); setSide("notes"); }}
-      />
+    </>
+  );
+  // Notes from before canvas-space notes stay on the recording, on the main screen only.
+  const screenContent = (
+    <>
+      {footage}
+      <AnnotationLayer notes={nearby.filter((n) => n.space !== "canvas")} tool="pointer" numbers={pins} onPinClick={openPin} />
     </>
   );
 
@@ -495,7 +505,8 @@ function ClipStage() {
               timeLabel={formatTime(time)}
               hasDraft={!!draft}
               onSubmit={(text, voice) => {
-                const id = addNote({ at: time, text, intents: draft?.region ? ["zoom"] : [], region: draft?.region, ink: draft?.ink, voice });
+                const onRecording = draft?.screen;
+                const id = addNote({ at: time, text, intents: onRecording ? ["zoom"] : [], space: "canvas", region: draft?.region, ink: draft?.ink, screen: onRecording, voice });
                 setDraft(null);
                 setTool("pointer");
                 select(id);
@@ -506,9 +517,9 @@ function ClipStage() {
         }
       >
         {flat ? (
-          <Camera scale={zoom?.scale ?? 1} target={zoom?.target ?? { x: 0.5, y: 0.5 }}>
+          <Camera {...camera}>
             <DeviceFrame kind={device} padding={project.frame.padding} radius={project.frame.radius} shadow={project.frame.shadow} contentAspect={recording.width / recording.height}>
-              {screenContent}
+              <RecordingScreen main>{screenContent}</RecordingScreen>
             </DeviceFrame>
           </Camera>
         ) : (
@@ -517,12 +528,57 @@ function ClipStage() {
             shot={shot}
             background={project.background}
             pose={poseAt(shot, time - project.span.start, project.motion)}
-            screen={<Camera scale={zoom?.scale ?? 1} target={zoom?.target ?? { x: 0.5, y: 0.5 }}><div style={{ position: "absolute", inset: 0 }}>{screenContent}</div></Camera>}
+            screen={<RecordingScreen main camera={camera}>{screenContent}</RecordingScreen>}
+            // The other screens in Tile Stack and Infinite Wall: the same footage, so marks on them land on the recording too.
+            extraScreens={[0, 1].map((i) => <RecordingScreen key={i} camera={camera}>{footage}</RecordingScreen>)}
           />
         )}
+        {/* Your marks, over the whole canvas: on the recording or the backdrop around it. */}
+        <AnnotationLayer
+          notes={nearby.filter((n) => n.space === "canvas")}
+          tool={tool}
+          draft={draft}
+          onDraft={setDraft}
+          numbers={pins}
+          onPinClick={openPin}
+          locate={locateOnRecording}
+        />
       </CanvasViewport>
     </div>
   );
+}
+
+const fill = { position: "absolute", inset: 0 } as const;
+
+/**
+ * One screen showing the recording, with corner markers so a mark on the
+ * canvas can be mapped onto the footage. With `camera` (the 3D shots) zooms
+ * happen inside the screen, which then crops them; flat shots zoom the whole
+ * canvas around it instead.
+ */
+function RecordingScreen({ main, camera, children }: { main?: boolean; camera?: { scale: number; target: { x: number; y: number } }; children: ReactNode }) {
+  if (!camera) return <div data-screen={main ? "main" : ""} style={fill}>{children}<ScreenCorners of="recording" /></div>;
+  return (
+    <div data-screen={main ? "main" : ""} style={fill}>
+      <ScreenCorners of="window" />
+      <Camera {...camera}><div style={fill}>{children}<ScreenCorners of="recording" /></div></Camera>
+    </div>
+  );
+}
+
+/**
+ * Where a region drawn on the canvas lands on the recording: through the
+ * screen under the region's center (the front one, in shots with several),
+ * else the main screen. Undefined when it's only on the backdrop.
+ */
+function locateOnRecording(region: Rect, layer: HTMLElement): Rect | undefined {
+  const c = layer.getBoundingClientRect();
+  const under = document.elementsFromPoint(c.left + (region.x + region.w / 2) * c.width, c.top + (region.y + region.h / 2) * c.height)
+    .map((el) => el.closest("[data-screen]")).find((el) => el && layer.parentElement?.contains(el));
+  const screen = under ?? layer.parentElement?.querySelector("[data-screen=main]");
+  const recording = measureQuad(screen?.querySelector("[data-of=recording]") ?? null, layer);
+  if (!recording) return undefined;
+  return canvasToRecording({ recording, window: measureQuad(screen!.querySelector(":scope > [data-of=window]"), layer) }, region);
 }
 
 /** The preview's own clock: plays from the start whenever the shot changes, and loops over the span. */
@@ -651,14 +707,17 @@ function SidePanel() {
   return (
     <Panel className={styles.side} inert={!shown} header={
       <>
-        <Switcher label="Side panel" value={side} onChange={setSide} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: open }]} />
+        <Switcher label="Side panel" value={side} onChange={setSide} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: open }, { value: "changes", label: "Changes" }]} />
         <span className={styles.status}>
           <Cell variant={running ? "solid" : "muted"} size={6} className={running ? styles.working : undefined} />
           {running ? "Working" : label}
         </span>
+        <AgentMenu />
       </>
     }>
-      {side === "agent" ? <CtaRegion name="agent"><AgentPane /></CtaRegion> : <CtaRegion name="notes"><NotesPane /></CtaRegion>}
+      {side === "agent" ? <CtaRegion name="agent"><AgentPane /></CtaRegion>
+        : side === "notes" ? <CtaRegion name="notes"><NotesPane /></CtaRegion>
+        : <CtaRegion name="changes"><ChangesPane /></CtaRegion>}
     </Panel>
   );
 }
@@ -676,8 +735,8 @@ function AgentConversation() {
   const notes = useEditor((s) => s.project.notes);
   const running = useAgent((s) => s.running);
   const queue = useAgent((s) => s.queue);
-  const waiting = useAgent((s) => s.messages.at(-1)?.status?.type === "requires-action");
-  const { applyNotes, send, dequeue, undo } = useAgent.getState();
+  const { applyNotes, send, undo } = useAgent.getState();
+  const actions = useAgentActions();
   const open = notes.filter((n) => n.status === "open");
   const items = useMemo(() => {
     if (running || queue.length) return [];
@@ -690,10 +749,11 @@ function AgentConversation() {
   return (
     <AgentThread
       suggestions={<SuggestionChips items={items} />}
-      queue={<AgentQueue items={queue} waiting={waiting} onRemove={dequeue} />}
+      above={<AgentAbove />}
+      composer={<AgentComposerBar />}
+      actions={actions}
       onUndo={undo}
       empty={isTauri ? <AgentEmpty>Talk through your notes with Claude Code. It can't change the timeline yet.</AgentEmpty> : undefined}
-      composerMeta={<AgentChoices />}
     />
   );
 }
@@ -707,36 +767,6 @@ function AgentUpdate() {
   useEffect(() => { if (version) void check(version); }, [version, check]);
   if (!available) return null;
   return <CliUpdateNotice installed={available.installed} latest={available.latest} state={state} onUpdate={install} onDismiss={dismiss} />;
-}
-
-/**
- * Model and effort for the next message, as the installed Claude Code lists
- * them, so new models and levels show up without an app update. The fixed
- * lists are only for a CLI that can't say.
- */
-function AgentChoices() {
-  const model = useAgent((s) => s.model);
-  const catalog = useAgent((s) => s.catalog);
-  const modelChoice = useAgent((s) => s.modelChoice);
-  const effortChoice = useAgent((s) => s.effortChoice);
-  const plan = useAgent((s) => (s.connection.phase === "ready" ? s.connection.plan : null));
-  const { setModelChoice, setEffortChoice } = useAgent.getState();
-  const current = catalog?.find((m) => m.value === (modelChoice ?? "default"));
-  const models = catalog ? catalog.map((m) => ({ value: m.value, label: m.displayName })) : AGENT_MODELS;
-  const efforts = current ? [{ value: "default", label: "Default" }, ...(current.supportedEffortLevels ?? []).map((l) => ({ value: l, label: effortLabel(l) }))] : AGENT_EFFORTS;
-  const showEffort = current ? current.supportsEffort !== false && !!current.supportedEffortLevels?.length : true;
-  const picked = models.find((m) => m.value === modelChoice);
-  return (
-    <>
-      <MenuSelect label="Model" display={model ?? picked?.label ?? "Default model"} value={modelChoice ?? "default"} options={models}
-        onChange={(v) => setModelChoice(v === "default" ? null : v)} />
-      {showEffort && (
-        <MenuSelect label="Effort" display={effortChoice ? effortLabel(effortChoice) : "Default effort"} hint={effortChoice ? undefined : "Uses the model's own default"}
-          value={effortChoice ?? "default"} options={efforts} onChange={(v) => setEffortChoice(v === "default" ? null : v)} />
-      )}
-      {plan && <Tag size="sm" title={`Runs on your Claude ${plan} plan`}>{plan.charAt(0).toUpperCase() + plan.slice(1)}</Tag>}
-    </>
-  );
 }
 
 function NotesPane() {

@@ -107,6 +107,81 @@ export const CTA_EXAMPLES: [intent: string, good: string, bad: string][] = [
   ["finish", "Export 1080p · Export for Slack", "Done · Finish"],
 ];
 
+/**
+ * UI blocks: how the agent brings up a component while it has no tools. It
+ * writes a fenced block in its reply, named after the tool it stands for, and
+ * the app turns it into that tool's part (src/editor/agent-stream.ts). The
+ * shape here is exactly what the app reads; the answer is what it sends back,
+ * after a line worded as the key the person pressed, inside
+ * <spontaneous-answer tool="…" id="…">…</spontaneous-answer>.
+ */
+export interface BlockSpec {
+  tool: string;
+  /** When to write it, in one line. */
+  when: string;
+  /** The payload, as compact JSON with example values. Optional fields are marked "?". */
+  shape: string;
+  /** What comes back when the person answers. */
+  answer: string;
+}
+
+export const BLOCK_SPECS: BlockSpec[] = [
+  {
+    tool: "propose_plan",
+    when: "Any change to the video: one or more edits. The person reviews, reorders and runs it; the app applies each step and tells you what landed.",
+    shape: `{"title":"Tighten the intro","estimate?":"~20s","steps":[{"id":"s1","title":"Zoom on the Create button","tool":"add_zoom","args":{"start":11.2,"end":16.6,"scale":1.8,"target":{"x":0.36,"y":0.84}}},{"id":"s2","title":"Call out the share link","tool":"add_overlay","args":{"kind":"callout","start":65,"end":68,"label":"Copy the link"}},{"id":"s3","title":"Open on Lid Rise","tool":"set_shot","args":{"shot":"lid-rise"}},{"id":"s4","title":"Calmer camera","tool":"set_motion","args":{"speed":0.8,"amount":0.6}},{"id":"s5","title":"Drop the auto zoom at 0:40","tool":"remove_zoom","args":{"start":40,"end":44}}],"cta?":{"primary":{"label":"Tighten the intro"}}}`,
+    answer: `{"action":"run","steps":[…in the person's order, maybe renamed or removed…]} then a summary of each step's result; or {"action":"cancel"}`,
+  },
+  {
+    tool: "ask_user",
+    when: "A matter of taste you can't decide: one short question, 2–4 short options.",
+    shape: `{"question":"What pace should the launch cut have?","options":["Punchy, 20s","Walkthrough, 45s"]}`,
+    answer: `{"answer":"Punchy, 20s"}`,
+  },
+  {
+    tool: "suggest_shot",
+    when: "You have a favorite shot for part of the video. First option is your pick; give a reason and a confidence of 1–3.",
+    shape: `{"context?":"0:00–0:06","options":[{"id":"lid-rise","label":"Lid Rise","reason":"The lid opens and the screen powers on: a strong opener.","confidence":3},{"id":"orbit-in","label":"Orbit In","reason":"A slow orbit settles on the screen.","confidence":2}],"cta?":{"primary":{"label":"Use Lid Rise first"}}}`,
+    answer: `{"used":"lid-rise"} (the app has already switched the shot) or {"undone":"lid-rise"}`,
+  },
+  {
+    tool: "propose_text_edit",
+    when: "Changing words: an overlay's label, a note's text, the video title. The person accepts or rejects each change.",
+    shape: `{"target":"overlay:o2","label?":"Callout · Make it shorter","original":"Click here to create your first project","suggested":"Create your first project"}`,
+    answer: `{"text":"the final text, as decided"} (the app has already written it to the target)`,
+  },
+  {
+    tool: "answer_with_moments",
+    when: "Answering a question about the recording: cite the moments each sentence rests on.",
+    shape: `{"segments":[{"text":"Trim the filler at the start.","cite":["m1"]},{"text":"Zoom in as you click Create.","cite":["m2","n2"],"paragraph?":false}],"moments":[{"id":"m1","at":0,"kind":"transcript","title":"Intro","quote?":"So, um, this is…","highlight?":["um"]},{"id":"m2","at":11.2,"kind":"click","title":"Click on Create"},{"id":"n2","at":12,"kind":"note","pin":2,"title":"zoom here"}],"edits?":2}`,
+    answer: `{"action":"apply"} when the person wants it as edits: reply with a propose_plan`,
+  },
+  {
+    tool: "request_approval",
+    when: "Before something hard to undo that isn't a plain plan step. Plan steps are already approved by running the plan.",
+    shape: `{"title":"Replace the recording's audio with the cleaned track","description?":"Room hum removed","risk":"medium","tool?":"replace_audio","details?":[{"label":"Track","value":"Microphone"}]}`,
+    answer: `{"approved":true,"always":false} or {"approved":false}`,
+  },
+  {
+    tool: "request_permission",
+    when: "You need a right you don't have, scoped once, for an hour, or always.",
+    shape: `{"action":"write to ~/Movies/Spontaneous","target?":"Files · ~/Movies/Spontaneous","risk":"risky","reason":"I'll save the export there.","preview?":[{"id":"f1","label":"Projects-demo.mp4","meta":"182 MB"}]}`,
+    answer: `{"allow":true,"scope":"once"} or {"allow":false}`,
+  },
+  {
+    tool: "try_variants",
+    when: "You compared a few ways to do the same edit and want the person to pick. Score each 0–100; say what it does in one line.",
+    shape: `{"task":"Pace the intro","attempts":[{"id":"a1","name":"Tight cut","approach?":"Cut 6.4s of pauses","score":86,"note":"Cuts 6.4s · keeps the click"},{"id":"a2","name":"Speed ramp 2×","score":71,"note":"Saves 3.5s · typing reads rushed"}]}`,
+    answer: `{"picked":"a1"}: reply with a propose_plan for that one`,
+  },
+  {
+    tool: "reply_to_note",
+    when: "Answering on one note, e.g. when a note asks you something with @agent.",
+    shape: `{"note":"n2","text":"Slowed the zoom in and held it a second longer.","status?":{"label":"Retimed the zoom","at":11,"end":17,"details":[["Ease in","0.6s"]]}}`,
+    answer: `none; it appears under the note`,
+  },
+];
+
 export const SURFACES: AgentSurface[] = [
   /* ── While it thinks ─────────────────────────────────────────── */
   {
