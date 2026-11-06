@@ -10,7 +10,7 @@
  * The model menu grows out of the key's corner. Pointing at a model fills its
  * speed, quality and cost meters one cell at a time while the other rows step
  * back; the highlight glides between rows. Under the list sits the effort, a
- * ladder of cells that fill up to the chosen level. There is no "default"
+ * step slider with a tick per level. There is no "default"
  * level: one is always picked, so you can see what the agent will do. The tray
  * at the bottom rolls to the highlighted model's first-token time and price.
  *
@@ -24,6 +24,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { motion, useReducedMotion } from "motion/react";
 import { Check, ChevronDown } from "lucide-react";
 import { Cell, Key, RollNumber, RollText, Swap } from "@/ui/atoms";
+import { Slider } from "@/ui/base/slider/slider";
 import { motionTokens } from "@/ui/tokens/motion";
 import { ClaudeCodeIcon, CodexIcon } from "./harness-icons";
 import styles from "./model-picker.module.css";
@@ -136,33 +137,19 @@ function Segments({ value = 0 }: { value?: number }) {
   );
 }
 
-/** The effort as a ladder of cells, filled up to the chosen level. A radio group: arrows move the choice and the focus. */
-function EffortLadder({ efforts, value, onChange }: { efforts: EffortOption[]; value: Effort; onChange: (e: Effort) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const chosen = Math.max(0, efforts.findIndex((o) => o.value === value));
-  const [hover, setHover] = useState<number | null>(null);
-  const shown = hover ?? chosen;
-  const onKey = (e: KeyboardEvent) => {
-    const step = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
-    const to = e.key === "Home" ? 0 : e.key === "End" ? efforts.length - 1 : step ? Math.min(efforts.length - 1, Math.max(0, chosen + step)) : -1;
-    if (to < 0) return;
-    e.preventDefault();
-    onChange(efforts[to]!.value);
-    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
-  };
+/**
+ * The effort as a step slider: one tick per level the model offers, the thumb
+ * snapping between them, the level's name as the readout. It's the app's own
+ * slider, so it drags, springs and answers keys like the ones in the inspector.
+ */
+function EffortSlider({ efforts, value, onChange }: { efforts: EffortOption[]; value: Effort; onChange: (e: Effort) => void }) {
+  const index = Math.max(0, efforts.findIndex((o) => o.value === value));
+  const last = efforts.length - 1;
   return (
     <div className={styles.effort}>
-      <span className={styles.settingName}>Effort</span>
-      <div ref={ref} role="radiogroup" aria-label="Effort" className={styles.ladder} onKeyDown={onKey} onPointerLeave={() => setHover(null)}>
-        {efforts.map((o, i) => (
-          <button key={o.value} type="button" role="radio" aria-checked={i === chosen} aria-label={o.label} tabIndex={i === chosen ? 0 : -1}
-            className={styles.rung} data-fill={i <= shown || undefined}
-            style={{ "--n": i } as CSSProperties} onPointerEnter={() => setHover(i)} onClick={() => onChange(o.value)}>
-            <Cell size={8} className={styles.rungCell} />
-          </button>
-        ))}
-      </div>
-      <RollText text={efforts[shown]?.label ?? ""} className={styles.effortLabel} aria-hidden />
+      <Slider label="Effort" min={0} max={Math.max(1, last)} step={1} largeStep={1} value={index}
+        marks={efforts.map((_, i) => i)} format={(i) => efforts[Math.round(i)]?.label ?? ""} disabled={last < 1}
+        onValueChange={(i) => { const next = efforts[Math.round(i)]; if (next && next.value !== value) onChange(next.value); }} />
     </div>
   );
 }
@@ -282,7 +269,7 @@ export function ModelPicker({
 
           {efforts.length > 0 && (
             <div className={styles.settings}>
-              <EffortLadder efforts={efforts} value={currentEffort} onChange={setEffort} />
+              <EffortSlider efforts={efforts} value={currentEffort} onChange={setEffort} />
             </div>
           )}
 
