@@ -134,3 +134,18 @@
 .updateError { margin: 0; color: var(--rec); font-size: var(--text-xs); line-height: 1.45; overflow-wrap: anywhere; }
 .updateNote { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
 @media (prefers-reduced-motion: reduce) { .update { animation: none; } }
+/* ── Tool calls and UI blocks ────────────────────────────────── */
+/* A tool call line, with Undo beside edits; the key shows on hover and focus. */
+.toolRow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--space-1); }
+.toolRow[data-undone] { opacity: .55; }
+.toolUndo { margin-top: 3px; opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard); }
+.toolRow:hover .toolUndo, .toolUndo:focus-visible { opacity: 1; }
+@media (hover: none) { .toolUndo { opacity: 1; } }
+/* A block that couldn't be read, or one that was set aside: one quiet line. */
+.blockError, .blockNote { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+/* The agent answered on a note: a link to it. */
+.noteReply { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--space-2) var(--space-2-5); border: 0; border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: var(--card-shadow); color: var(--text-muted); font-size: var(--text-xs); text-align: left; transition: box-shadow var(--duration-fast) var(--ease-standard); }
+.noteReply:hover { box-shadow: var(--card-shadow-hover); }
+.noteReplyText { color: var(--foreground); font-size: var(--text-sm); }
+/* Edits a tool-call group made, undone together. */
+.groupUndo { display: flex; justify-content: flex-end; margin-top: calc(var(--space-1) * -1); }

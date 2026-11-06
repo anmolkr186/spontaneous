@@ -3,7 +3,7 @@
  * agents read and the docs site never drift apart. Run: npm run docs:agent-ui
  */
 import { writeFileSync } from "node:fs";
-import { CHOOSING, CTA_EXAMPLES, CTA_RULES, SURFACES, SURFACE_GROUPS } from "../src/ui/agent-ui/catalog.ts";
+import { BLOCK_SPECS, CHOOSING, CTA_EXAMPLES, CTA_RULES, SURFACES, SURFACE_GROUPS } from "../src/ui/agent-ui/catalog.ts";
 
 const words = (id: string) => id.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/^./, (c) => c.toUpperCase());
 const nameOf = (component: string) => component.split(/,\s*/).map(words).join(", ");
@@ -31,6 +31,20 @@ Ask these in order; the first that matches wins.
 |---|---|
 ${CHOOSING.map(([w, u]) => `| ${w} | ${named(u)} |`).join("\n")}
 
+## UI blocks (while the agent has no tools)
+
+Until the MCP tools exist, the agent brings up a component by writing a fenced block in its reply: a line \`\`\`\`spontaneous <tool>\`\`\`\`, one JSON object, and a closing fence. The app turns it into that tool's part (\`src/editor/agent-stream.ts\`), so the thread renders it exactly as it will render the real tool. The agent's system prompt is generated from the same table (\`src-tauri/src/agent_prompt.txt\`).
+
+${BLOCK_SPECS.map((b) => `### \`${b.tool}\`
+
+${b.when}
+
+\`\`\`json
+${b.shape}
+\`\`\`
+
+Answer: ${b.answer}
+`).join("\n")}
 ## Writing a CTA
 
 Any UI tool call may carry \`"cta": { "primary": { "label", "intent" }, "secondary": [{ "label" }] }\`. The app shows your label when it passes these rules and its own derived label otherwise, so a key is never missing or wrong. Which key is primary on a surface is the app's call: one per surface, ranked by intent, and Export waits while any work or decision is pending.

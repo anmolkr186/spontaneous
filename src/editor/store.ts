@@ -8,7 +8,7 @@ const initialProject = isTauri ? { ...mockProject, name: "New project", folder: 
 import type { BackgroundId, Note, Overlay, Project, Seconds, TemplateId, Zoom } from "./model";
 
 export type InspectorTab = "template" | "style" | "cursor" | "motion" | "audio";
-export type SideTab = "agent" | "notes";
+export type SideTab = "agent" | "notes" | "changes";
 export type DockTool = "pointer" | "pen" | "region";
 /** Lite: stage, notes and the agent. Studio: adds the inspector and the full timeline. */
 export type EditorMode = "lite" | "studio";

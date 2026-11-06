@@ -5,14 +5,15 @@ import { ChevronDown, Clapperboard, Film, PanelLeftClose, PanelLeftOpen, PanelRi
 import { Slider } from "@/ui/base/slider/slider";
 import { Switch } from "@/ui/base/switch/switch";
 import { ScrubInput } from "@/ui/base/scrub-input/scrub-input";
-import { Cell, IconKey, Key, Mark, Tag, Timecode } from "@/ui/atoms";
-import { Field, Group, Hint, MenuSelect, NoteCard, Panel, SwatchPicker, Switcher } from "@/ui/molecules";
+import { Cell, IconKey, Key, Mark, Timecode } from "@/ui/atoms";
+import { Field, Group, Hint, NoteCard, Panel, SwatchPicker, Switcher } from "@/ui/molecules";
 import { EXTRA_TONES, ScreenArt, ShotCard, ShotScene, standInTone } from "@/ui/organisms/shot";
 import { AnnotationLayer, Callout, Camera, CanvasViewport, Cursor, DeviceFrame, VideoScreen, stageStyles, useElementSize } from "@/ui/organisms/stage";
 import type { DeviceKind } from "@/ui/organisms/stage";
 import { AnnotationDock, Dock, DockDivider, DockTool } from "@/ui/organisms/dock";
 import { ClipItem, NoteMarker, Timeline, Track, TrackItem, Transport, Waveform, fitPps } from "@/ui/organisms/timeline";
-import { AgentConnect, AgentEmpty, AgentQueue, AgentThread, CliUpdateNotice, SuggestionChips } from "@/ui/organisms/agent";
+import { AgentConnect, AgentEmpty, AgentThread, CliUpdateNotice, SuggestionChips } from "@/ui/organisms/agent";
+import { Toaster } from "@/ui/organisms/toaster";
 import { AgentRuntimeProvider, useAgentStoreRuntime } from "@/ui/organisms/agent/runtime";
 import type { AgentMessage, AppendMessage } from "@/ui/organisms/agent/runtime";
 import { capture } from "@/platform/capture";
@@ -26,7 +27,9 @@ import { activeZoom, useEditor } from "./store";
 import type { EditorMode, InspectorTab } from "./store";
 import { useAgent } from "./agent";
 import { useAgentUpdate } from "./agent-update";
-import { AGENT_EFFORTS, AGENT_MODELS, effortLabel } from "./agent-stream";
+import { AgentAbove, AgentComposerBar, AgentMenu, useAgentActions } from "./agent-panel";
+import { ChangesPane } from "./ChangesPane";
+import { CommandPalette } from "./CommandPalette";
 import { CtaKey, CtaRegion, CtaRoot, exportLabel, notesLabel } from "@/ui/cta";
 import { cursorAtTime, projectFromRecording } from "./recording";
 import styles from "./editor.module.css";
@@ -58,6 +61,8 @@ export function Editor() {
         <AgentUpdate />
         {mode === "studio" ? <TimelinePanel /> : !previewing && <ScrubBar />}
       </div>
+      <Toaster position="bottom-left" />
+      <CommandPalette />
       </CtaRoot>
     </AgentRuntimeProvider>
   );
@@ -110,7 +115,7 @@ function useAgentRuntime() {
     },
     onCancel: async () => useAgent.getState().cancel(),
     onAddToolResult: ({ toolCallId, result }) => {
-      useAgent.getState().answer(toolCallId, (result as { answer: string }).answer);
+      useAgent.getState().answer(toolCallId, result);
     },
   });
 }
@@ -651,14 +656,17 @@ function SidePanel() {
   return (
     <Panel className={styles.side} inert={!shown} header={
       <>
-        <Switcher label="Side panel" value={side} onChange={setSide} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: open }]} />
+        <Switcher label="Side panel" value={side} onChange={setSide} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: open }, { value: "changes", label: "Changes" }]} />
         <span className={styles.status}>
           <Cell variant={running ? "solid" : "muted"} size={6} className={running ? styles.working : undefined} />
           {running ? "Working" : label}
         </span>
+        <AgentMenu />
       </>
     }>
-      {side === "agent" ? <CtaRegion name="agent"><AgentPane /></CtaRegion> : <CtaRegion name="notes"><NotesPane /></CtaRegion>}
+      {side === "agent" ? <CtaRegion name="agent"><AgentPane /></CtaRegion>
+        : side === "notes" ? <CtaRegion name="notes"><NotesPane /></CtaRegion>
+        : <CtaRegion name="changes"><ChangesPane /></CtaRegion>}
     </Panel>
   );
 }
@@ -676,8 +684,8 @@ function AgentConversation() {
   const notes = useEditor((s) => s.project.notes);
   const running = useAgent((s) => s.running);
   const queue = useAgent((s) => s.queue);
-  const waiting = useAgent((s) => s.messages.at(-1)?.status?.type === "requires-action");
-  const { applyNotes, send, dequeue, undo } = useAgent.getState();
+  const { applyNotes, send, undo } = useAgent.getState();
+  const actions = useAgentActions();
   const open = notes.filter((n) => n.status === "open");
   const items = useMemo(() => {
     if (running || queue.length) return [];
@@ -690,10 +698,11 @@ function AgentConversation() {
   return (
     <AgentThread
       suggestions={<SuggestionChips items={items} />}
-      queue={<AgentQueue items={queue} waiting={waiting} onRemove={dequeue} />}
+      above={<AgentAbove />}
+      composer={<AgentComposerBar />}
+      actions={actions}
       onUndo={undo}
       empty={isTauri ? <AgentEmpty>Talk through your notes with Claude Code. It can't change the timeline yet.</AgentEmpty> : undefined}
-      composerMeta={<AgentChoices />}
     />
   );
 }
@@ -707,36 +716,6 @@ function AgentUpdate() {
   useEffect(() => { if (version) void check(version); }, [version, check]);
   if (!available) return null;
   return <CliUpdateNotice installed={available.installed} latest={available.latest} state={state} onUpdate={install} onDismiss={dismiss} />;
-}
-
-/**
- * Model and effort for the next message, as the installed Claude Code lists
- * them, so new models and levels show up without an app update. The fixed
- * lists are only for a CLI that can't say.
- */
-function AgentChoices() {
-  const model = useAgent((s) => s.model);
-  const catalog = useAgent((s) => s.catalog);
-  const modelChoice = useAgent((s) => s.modelChoice);
-  const effortChoice = useAgent((s) => s.effortChoice);
-  const plan = useAgent((s) => (s.connection.phase === "ready" ? s.connection.plan : null));
-  const { setModelChoice, setEffortChoice } = useAgent.getState();
-  const current = catalog?.find((m) => m.value === (modelChoice ?? "default"));
-  const models = catalog ? catalog.map((m) => ({ value: m.value, label: m.displayName })) : AGENT_MODELS;
-  const efforts = current ? [{ value: "default", label: "Default" }, ...(current.supportedEffortLevels ?? []).map((l) => ({ value: l, label: effortLabel(l) }))] : AGENT_EFFORTS;
-  const showEffort = current ? current.supportsEffort !== false && !!current.supportedEffortLevels?.length : true;
-  const picked = models.find((m) => m.value === modelChoice);
-  return (
-    <>
-      <MenuSelect label="Model" display={model ?? picked?.label ?? "Default model"} value={modelChoice ?? "default"} options={models}
-        onChange={(v) => setModelChoice(v === "default" ? null : v)} />
-      {showEffort && (
-        <MenuSelect label="Effort" display={effortChoice ? effortLabel(effortChoice) : "Default effort"} hint={effortChoice ? undefined : "Uses the model's own default"}
-          value={effortChoice ?? "default"} options={efforts} onChange={(v) => setEffortChoice(v === "default" ? null : v)} />
-      )}
-      {plan && <Tag size="sm" title={`Runs on your Claude ${plan} plan`}>{plan.charAt(0).toUpperCase() + plan.slice(1)}</Tag>}
-    </>
-  );
 }
 
 function NotesPane() {

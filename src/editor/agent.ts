@@ -1,14 +1,20 @@
 import { create } from "zustand";
 import type { AgentMessage as ThreadMessageLike } from "@/ui/organisms/agent/runtime";
 import { formatTime, uid } from "./model";
-import type { Note, Zoom } from "./model";
+import type { Note } from "./model";
 import { useEditor } from "./store";
 import { isTauri } from "@/platform/tauri";
 import { SHOTS, shotById } from "./shots";
 import type { Shot } from "./shots";
 import { agent } from "@/platform/agent";
 import type { AgentEvent, AgentModel } from "@/platform/agent";
-import { AGENT_MODELS, modelName, reduceParts } from "./agent-stream";
+import { AGENT_MODELS, finalizeBlocks, modelName, reduceParts } from "./agent-stream";
+import { applyStep, runUndo, stepName, stepRange, stepRisk, STEP_TOOLS } from "./apply";
+import type { ProposedStep, UndoRecord } from "./apply";
+import { useChanges } from "./changes";
+import { approvalLabels, planLabel } from "@/ui/cta";
+import { toast } from "@/ui/organisms/toaster";
+import { playDemo } from "./demo-run";
 
 /** Read a camera request from plain language. The real agent does this with tools; this is the scripted stand-in. */
 function parseShotRequest(text: string): { shot?: Shot; speed?: number; amount?: number } | null {
@@ -31,12 +37,13 @@ function parseShotRequest(text: string): { shot?: Shot; speed?: number; amount?:
 type Part = Exclude<ThreadMessageLike["content"], string>[number];
 type Msg = ThreadMessageLike & { id: string };
 
-/** What a finished edit needs to be reverted. Kept on the tool result so Undo works from the thread. */
-export type UndoRecord =
-  | { kind: "remove"; id: string }
-  | { kind: "restore-zoom"; zoom: Zoom }
-  | { kind: "shot"; template: string }
-  | { kind: "motion"; speed: number; amount: number };
+export type { UndoRecord };
+
+/** How much the agent may apply without asking: 0 always ask, 1 ask if risky, 2 full auto. Pinned tools always ask. */
+export interface Autonomy { level: 0 | 1 | 2; pinned: string[] }
+
+/** What the CLI reported for the last turn, for the Context window and the monitor. */
+export interface AgentUsage { input: number; cacheRead: number; output: number; cost: number }
 
 /** A run waiting for the agent: applying notes, or a message you sent while it was busy. */
 export interface QueuedRun {
@@ -86,7 +93,17 @@ interface AgentState {
   send: (text: string) => void;
   /** Apply open notes (all of them when no ids). Queued if the agent is busy; notes already queued or applying are skipped. */
   applyNotes: (noteIds?: string[]) => void;
-  answer: (toolCallId: string, answer: string) => void;
+  /** Answer a part: an ask, a UI block, or an approval the app raised while running a plan. */
+  answer: (toolCallId: string, result: unknown) => void;
+  autonomy: Autonomy;
+  setAutonomy: (patch: Partial<Autonomy>) => void;
+  usage: AgentUsage | null;
+  /** When the current run started (ms since epoch), for the monitor's clock. Null when idle. */
+  runStartedAt: number | null;
+  /** Replay a scripted run that shows every component. Never calls Claude Code. */
+  playDemo: () => void;
+  /** Send the last message again. */
+  regenerate: () => void;
   /** Stop the current run and clear the queue. Notes that hadn't finished go back to open. */
   cancel: () => void;
   /** Take one run off the queue; its notes go back to open. */
@@ -110,6 +127,15 @@ let signInAttempt = 0;
 /** The CLI takes its model and effort at launch, so a new choice restarts it on the same conversation. */
 let sessionStale = false;
 
+/** Approvals the app raised while running a plan, waiting for the person. */
+const pending = new Map<string, (result: unknown) => void>();
+
+/** A plan step as it runs: what was proposed, plus where it is. */
+type RunStep = ProposedStep & { status: "pending" | "running" | "done" | "failed"; duration?: number; startedAt?: number; error?: string };
+
+/** Parts the demo run made answer in the script, never to Claude Code. */
+const isLive = (toolCallId: string) => isTauri && !toolCallId.startsWith("demo-");
+
 const CHOICES_KEY = "spontaneous.agent";
 
 function loadChoices(): { modelChoice: string | null; effortChoice: string | null } {
@@ -121,9 +147,42 @@ function loadChoices(): { modelChoice: string | null; effortChoice: string | nul
   }
 }
 
-function saveChoices(choices: { modelChoice: string | null; effortChoice: string | null }) {
-  try { localStorage.setItem(CHOICES_KEY, JSON.stringify(choices)); } catch { /* storage unavailable */ }
+function saveChoices(choices: Record<string, unknown>) {
+  try { localStorage.setItem(CHOICES_KEY, JSON.stringify({ ...JSON.parse(localStorage.getItem(CHOICES_KEY) ?? "{}"), ...choices })); } catch { /* storage unavailable */ }
 }
+
+function loadAutonomy(): Autonomy {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CHOICES_KEY) ?? "{}").autonomy;
+    if (saved && [0, 1, 2].includes(saved.level)) return { level: saved.level, pinned: Array.isArray(saved.pinned) ? saved.pinned : [] };
+  } catch { /* storage unavailable */ }
+  return { level: 1, pinned: [] };
+}
+
+/**
+ * What the agent knows about the project, sent ahead of every message: it has
+ * no tools to read it. Kept short; times in seconds, areas as 0–1 of the frame.
+ */
+function projectOutline(): string {
+  const p = useEditor.getState().project;
+  const r = (n: number) => Math.round(n * 100) / 100;
+  const notes = p.notes.filter((n) => n.status !== "dismissed").sort((a, b) => a.at - b.at)
+    .map((n, i) => `  note ${n.id} pin ${i + 1} at ${r(n.at)}s${n.region ? ` area x ${r(n.region.x)} y ${r(n.region.y)} w ${r(n.region.w)} h ${r(n.region.h)}` : ""} [${n.status}]: ${n.text || "(marked, no text)"}`);
+  const zooms = p.zooms.map((z) => `  zoom ${z.id} ${r(z.start)}–${r(z.end)}s ${z.scale}× at x ${r(z.target.x)} y ${r(z.target.y)} (${z.author})`);
+  const overlays = p.overlays.map((o) => `  ${o.kind} ${o.id} ${r(o.start)}–${r(o.end)}s "${o.label}" (${o.author})`);
+  return [
+    `<project name="${p.name}" length="${r(p.duration)}s" shot="${p.template}" camera-speed="${p.motion.speed}" camera-amount="${p.motion.amount}">`,
+    notes.length ? `notes:\n${notes.join("\n")}` : "notes: none",
+    zooms.length ? `zooms:\n${zooms.join("\n")}` : "zooms: none",
+    overlays.length ? `overlays:\n${overlays.join("\n")}` : "overlays: none",
+    `shots you can use: ${SHOTS.map((s) => `${s.id} (${s.name})`).join(", ")}`,
+    "</project>",
+  ].join("\n");
+}
+
+/** The line that tells the agent what the person chose, after the words on the key they pressed. */
+const answerLine = (said: string, tool: string, id: string, payload: unknown) =>
+  `${said}\n<spontaneous-answer tool="${tool}" id="${id}">${JSON.stringify(payload)}</spontaneous-answer>`;
 
 /** The prompt for a batch of notes: where each one sits and what it says. */
 function notesPrompt(notes: Note[]): string {
@@ -220,6 +279,7 @@ export const useAgent = create<AgentState>((set, get) => {
     const token = ++runToken;
     set((s) => ({
       running: true,
+      runStartedAt: Date.now(),
       messages: [
         ...s.messages,
         { id: uid("m"), role: "user", content: [{ type: "text", text: userText }], metadata: notes?.length ? { custom: { notes } } : undefined },
@@ -232,7 +292,7 @@ export const useAgent = create<AgentState>((set, get) => {
   function finish(token: number) {
     if (token !== runToken) return;
     patchLast((m) => ({ ...m, status: { type: "complete", reason: "stop" } }));
-    set({ running: false });
+    set({ running: false, runStartedAt: null });
     pump();
   }
 
@@ -242,8 +302,9 @@ export const useAgent = create<AgentState>((set, get) => {
     end?.();
     if (token !== runToken) return;
     if (problem) pushPart({ type: "text", text: problem } as Part);
-    patchLast((m) => ({ ...m, status: problem ? { type: "incomplete", reason: "error" } : { type: "complete", reason: "stop" } }));
-    set({ running: false });
+    // A block whose closing fence never came is read as it stands.
+    patchLast((m) => ({ ...m, content: finalizeBlocks(m.content as Part[]), status: problem ? { type: "incomplete", reason: "error" } : { type: "complete", reason: "stop" } }));
+    set({ running: false, runStartedAt: null });
     pump();
   }
 
@@ -257,6 +318,8 @@ export const useAgent = create<AgentState>((set, get) => {
       } else if (event.type === "stream_event" || event.type === "assistant") {
         if (get().running) patchLast((m) => ({ ...m, content: reduceParts(m.content as Part[], event) }));
       } else if (event.type === "result") {
+        const u = event.usage as { input_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; output_tokens?: number } | undefined;
+        if (u) set({ usage: { input: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), cacheRead: u.cache_read_input_tokens ?? 0, output: u.output_tokens ?? 0, cost: Number(event.total_cost_usd ?? 0) } });
         if (!get().running) continue;
         const failed = event.is_error === true;
         endLiveRun(token, failed ? String(event.result ?? "Claude Code couldn't finish that.") : undefined);
@@ -285,12 +348,154 @@ export const useAgent = create<AgentState>((set, get) => {
           sessionOpen = true;
           sessionStale = false;
         }
-        await agent.send(prompt);
+        await agent.send(`${projectOutline()}\n\n${prompt}`);
       } catch (error) {
         sessionOpen = false;
         endLiveRun(token, String(error));
       }
     })();
+  }
+
+  /** The message holding a part stops waiting once the part is answered. */
+  function settle(toolCallId: string) {
+    set((s) => ({
+      messages: s.messages.map((m) => (typeof m.content !== "string" && m.status?.type === "requires-action" && m.content.some((p) => p.type === "tool-call" && p.toolCallId === toolCallId) ? { ...m, status: { type: "complete", reason: "stop" } } : m)),
+    }));
+  }
+
+  /** What the scripted agent says back when there's no Claude Code to answer. */
+  function scriptedReply(tool: string, r: Record<string, unknown>): string {
+    if (tool === "ask_user") return `Going with "${r.answer}". I'll draft the cut from the three clips and put title cards between them, as a plan you can run.`;
+    if (tool === "suggest_shot") return r.used ? `Switched the shot. Undo it from the card or from the Changes tab.` : "Kept the current shot.";
+    if (tool === "propose_text_edit") return "Updated the text. It's in the Changes tab if you want it back.";
+    if (tool === "request_permission") return r.allow ? "Thanks. I'll only use it for this." : "Understood. I'll keep the export in the project instead.";
+    if (tool === "request_approval") return r.approved ? "Going ahead." : "Left it as it was.";
+    if (tool === "try_variants") return "Going with that one. I'll turn it into a plan you can run.";
+    if (tool === "answer_with_moments") return "I'll turn those into a plan you can review first.";
+    if (tool === "propose_plan") return "Okay, I won't run it.";
+    return "Done.";
+  }
+
+  /** Posts the person's choice in the words of the key they pressed, and tells the agent. */
+  function reply(said: string, part: Extract<Part, { type: "tool-call" }>, payload: unknown) {
+    if (get().running) { toast("Wait for the agent to finish, then answer"); return; }
+    const token = start(said);
+    const id = part.toolCallId ?? "";
+    if (isLive(id)) { sendLive(answerLine(said, part.toolName, id, payload), token); return; }
+    void (async () => {
+      await streamText("text", scriptedReply(part.toolName, payload as Record<string, unknown>), token);
+      finish(token);
+    })();
+  }
+
+  const needsApproval = (tool: string) => {
+    const { level, pinned } = get().autonomy;
+    if (pinned.includes(tool)) return true;
+    const risk = stepRisk(tool);
+    if (risk === "unsupported") return false;
+    return level === 0 || (level === 1 && risk === "risky");
+  };
+
+  /** Raises an Approval card for one step and waits for the person. */
+  function askApproval(step: ProposedStep): Promise<boolean> {
+    // Resolved here in the app, never sent to Claude Code.
+    const toolCallId = uid("approve-");
+    const { from, to } = stepRange(step.args);
+    const details = [
+      { label: "Kind", value: STEP_TOOLS[step.tool]?.label ?? stepName(step.tool) },
+      ...(from !== undefined ? [{ label: to !== undefined ? "From" : "At", value: formatTime(from) }] : []),
+      ...(to !== undefined ? [{ label: "To", value: formatTime(to) }] : []),
+    ];
+    pushPart({ type: "tool-call", toolCallId, toolName: "request_approval", args: { title: step.title, description: "The plan's next step", risk: stepRisk(step.tool) === "risky" ? "medium" : "low", tool: step.tool, details } } as Part);
+    return new Promise((resolve) => pending.set(toolCallId, (r) => {
+      const result = r as { approved?: boolean; always?: boolean };
+      if (result.approved && result.always) get().setAutonomy({ pinned: get().autonomy.pinned.filter((t) => t !== step.tool) });
+      resolve(!!result.approved);
+    }));
+  }
+
+  /** Applies a plan's steps in the person's order, asking where the Autonomy dial says to, and reports back. */
+  async function runPlan(planId: string, r: Record<string, unknown>) {
+    const part = findPart(planId);
+    if (!part) return;
+    const args = part.args as { title?: string; steps?: ProposedStep[] };
+    const proposed = Array.isArray(args.steps) ? args.steps : [];
+    const prior = (part.result as { steps?: RunStep[] } | undefined)?.steps;
+    const retryFrom = r.action === "retry" ? prior?.findIndex((s) => s.id === r.from) ?? -1 : -1;
+    // The order and titles the person left in review; a retry keeps the last run's and redoes from the failed step.
+    const chosen = retryFrom >= 0 ? prior! : ((r.steps as { id: string; title?: string }[] | undefined) ?? proposed);
+    const steps: RunStep[] = chosen.flatMap((c, i) => {
+      const p = proposed.find((x) => x.id === c.id);
+      if (!p) return [];
+      const kept = retryFrom >= 0 && i < retryFrom && (c as RunStep).status === "done";
+      return [{ ...p, title: c.title ?? p.title, status: kept ? "done" : "pending", duration: kept ? (c as RunStep).duration : undefined } as RunStep];
+    });
+    const said = typeof r.said === "string" ? r.said : retryFrom >= 0 ? planLabel("failed", steps.length, retryFrom) : planLabel("draft", steps.length);
+    const token = start(said);
+    const startedAt = Date.now();
+    const update = (status: "running" | "done") => setPart(planId, { result: { action: "run", status, startedAt, steps: steps.map((s) => ({ ...s })) } });
+    update("running");
+    const before = useEditor.getState().project;
+    const results: string[] = [];
+    let applied = 0;
+    for (const step of steps) {
+      if (step.status === "done") continue;
+      if (token !== runToken) break;
+      step.status = "running";
+      step.startedAt = Date.now();
+      update("running");
+      if (needsApproval(step.tool) && !(await askApproval(step))) {
+        Object.assign(step, { status: "failed", error: "Skipped", duration: Date.now() - step.startedAt });
+        results.push(`${step.id} skipped: the person said no`);
+        update("running");
+        continue;
+      }
+      await sleep(280);
+      if (token !== runToken) break;
+      const outcome = applyStep(step);
+      step.duration = Date.now() - step.startedAt;
+      if (outcome.ok) {
+        step.status = "done";
+        applied++;
+        useChanges.getState().record(step, outcome.entry, outcome.undo);
+        results.push(`${step.id} applied: ${outcome.summary}`);
+      } else {
+        Object.assign(step, { status: "failed", error: outcome.error });
+        results.push(`${step.id} not applied: ${outcome.error}`);
+      }
+      update("running");
+    }
+    update("done");
+    if (applied) useChanges.getState().checkpoint(args.title ?? "Ran a plan", applied, before);
+    if (token !== runToken) return;
+    if (isLive(planId)) { sendLive(answerLine(said, "propose_plan", planId, { action: "run", results }), token); return; }
+    const failed = steps.filter((s) => s.status === "failed").length;
+    await streamText("text", `Applied ${applied} of ${steps.length} ${steps.length === 1 ? "step" : "steps"}.${failed ? ` ${failed} couldn't be applied; the plan says why.` : ""} Every edit is in the Changes tab with Undo.`, token);
+    finish(token);
+  }
+
+  /** Effects an answer has on the project before the agent hears it. Returns the result to keep on the part. */
+  function applyAnswer(part: Extract<Part, { type: "tool-call" }>, r: Record<string, unknown>): Record<string, unknown> {
+    const a = part.args as Record<string, unknown>;
+    if (part.toolName === "suggest_shot" && typeof r.used === "string") {
+      const before = useEditor.getState().project;
+      const step: ProposedStep = { id: part.toolCallId ?? "shot", title: `Use ${r.used}`, tool: "set_shot", args: { shot: r.used } };
+      const outcome = applyStep(step);
+      if (!outcome.ok) return { ...r, error: outcome.error };
+      const entry = useChanges.getState().record(step, outcome.entry, outcome.undo);
+      useChanges.getState().checkpoint(`Shot: ${String(outcome.entry.change?.[1] ?? r.used)}`, 1, before);
+      return { ...r, entry };
+    }
+    if (part.toolName === "propose_text_edit" && typeof r.text === "string" && typeof a.target === "string") {
+      const before = useEditor.getState().project;
+      const step: ProposedStep = { id: part.toolCallId ?? "text", title: "Edit text", tool: "set_text", args: { target: a.target, text: r.text } };
+      const outcome = applyStep(step);
+      if (!outcome.ok) return { ...r, error: outcome.error };
+      const entry = useChanges.getState().record(step, outcome.entry, outcome.undo);
+      useChanges.getState().checkpoint("Edited text", 1, before);
+      return { ...r, entry };
+    }
+    return r;
   }
 
   /** Start the next queued run if the agent is free. */
@@ -509,7 +714,36 @@ export const useAgent = create<AgentState>((set, get) => {
 
     messages: isTauri ? [] : seed,
     running: false,
+    runStartedAt: null,
     queue: [],
+    usage: null,
+    autonomy: loadAutonomy(),
+    setAutonomy: (patch) => {
+      const autonomy = { ...get().autonomy, ...patch };
+      set({ autonomy });
+      saveChoices({ autonomy });
+    },
+    regenerate: () => {
+      const last = [...get().messages].reverse().find((m) => m.role === "user");
+      const text = last && typeof last.content !== "string" ? last.content.map((p) => (p.type === "text" ? p.text : "")).join("") : "";
+      if (text) get().send(text.split("\n<spontaneous-answer")[0]!);
+    },
+    playDemo: () => {
+      if (get().running) { toast("Wait for the agent to finish, then play the demo"); return; }
+      // Each turn of the demo is its own run; a new message or Stop ends the demo.
+      let token = -1;
+      toast("Playing a demo run", { description: "Scripted in the app. It doesn't use Claude Code." });
+      void playDemo({
+        alive: () => token === runToken,
+        start: (text) => { token = start(text); },
+        finish: () => finish(token),
+        push: (part) => pushPart(part as Part),
+        patch: (toolCallId, patch) => setPart(toolCallId, patch as never),
+        hold: () => { patchLast((m) => ({ ...m, status: { type: "requires-action", reason: "tool-calls" } })); set({ running: false, runStartedAt: null }); },
+        streamText: (type, text) => streamText(type, text, token),
+        sleep,
+      });
+    },
 
     send: (text) => { if (connected()) enqueue({ id: uid("q"), label: text, text }); },
 
@@ -525,18 +759,35 @@ export const useAgent = create<AgentState>((set, get) => {
       enqueue({ id: uid("q"), label: refs.length === 1 ? `Note ${refs[0]!.index}` : `${refs.length} notes`, noteIds: ids });
     },
 
-    answer: (toolCallId, answer) => {
-      setPart(toolCallId, { result: { answer } });
-      const token = ++runToken;
-      set((s) => ({ running: true, messages: s.messages.map((m, i) => (i === s.messages.length - 1 ? { ...m, status: { type: "running" } } : m)) }));
-      void (async () => {
-        await streamText("text", `Going with "${answer}". I'll draft the cut from the three clips and put title cards between them. You'll see it on the timeline as agent edits you can undo together.`, token);
-        finish(token);
-      })();
+    answer: (toolCallId, result) => {
+      const waiting = pending.get(toolCallId);
+      if (waiting) { pending.delete(toolCallId); setPart(toolCallId, { result }); waiting(result); return; }
+      const part = findPart(toolCallId);
+      if (!part) return;
+      const r = (result && typeof result === "object" ? result : { answer: result }) as Record<string, unknown>;
+      settle(toolCallId);
+      if (part.toolName === "propose_plan") {
+        if (r.action === "run" || r.action === "retry") { void runPlan(toolCallId, r); return; }
+        if (part.result !== undefined) return;
+        setPart(toolCallId, { result: r });
+        reply(typeof r.said === "string" ? r.said : "Not now", part, r);
+        return;
+      }
+      if (part.result !== undefined) return;
+      const kept = applyAnswer(part, r);
+      setPart(toolCallId, { result: kept });
+      if (part.toolName === "reply_to_note") return;
+      const said = typeof r.said === "string" ? r.said
+        : part.toolName === "ask_user" ? String(r.answer)
+        : part.toolName === "request_approval" ? (r.approved ? approvalLabels(String((part.args as { tool?: string }).tool ?? "")).approve : "Keep current")
+        : "Done";
+      const { said: _said, ...payload } = kept;
+      reply(said, part, payload);
     },
 
     cancel: () => {
       runToken++;
+      for (const [id, resolve] of pending) { pending.delete(id); resolve({ approved: false }); }
       if (isTauri) {
         onRunEnd = null;
         sessionGeneration++;
@@ -577,12 +828,7 @@ export const useAgent = create<AgentState>((set, get) => {
       const part = findPart(toolCallId);
       const result = part?.result as { undo?: UndoRecord; undone?: boolean } | undefined;
       if (!result?.undo || result.undone) return;
-      const editor = useEditor.getState();
-      const u = result.undo;
-      if (u.kind === "remove") editor.removeItem(u.id);
-      else if (u.kind === "restore-zoom") editor.addZoom({ start: u.zoom.start, end: u.zoom.end, scale: u.zoom.scale, target: u.zoom.target, author: u.zoom.author });
-      else if (u.kind === "shot") editor.setTemplate(u.template);
-      else editor.setMotion({ speed: u.speed, amount: u.amount });
+      runUndo(result.undo);
       setPart(toolCallId, { result: { ...result, undone: true } });
     },
   };

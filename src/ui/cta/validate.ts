@@ -8,7 +8,7 @@ import type { CtaContext, CtaIntent, CtaProposal, ResolvedLabel } from "./types.
 
 /** Verbs a label may start with, per intent. */
 export const VERBS: Record<CtaIntent, string[]> = {
-  decide: ["approve", "allow", "replace", "overwrite", "delete", "remove", "send", "upload", "post", "publish", "use", "answer", "export", "cut", "trim", "change", "always"],
+  decide: ["approve", "allow", "replace", "overwrite", "delete", "remove", "send", "upload", "post", "publish", "use", "answer", "export", "cut", "trim", "change", "always", "add", "retune"],
   run: ["run", "apply", "start", "retry", "try", "render", "cut", "zoom", "add", "retime", "speed", "slow", "trim", "tighten", "fix", "send", "ask", "draft", "make", "change", "edit", "blur"],
   review: ["accept", "review", "keep", "apply"],
   apply: ["apply", "use", "add", "cut", "zoom", "retime", "trim", "insert", "change", "go", "jump"],

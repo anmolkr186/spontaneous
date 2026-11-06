@@ -62,6 +62,10 @@ export function planLabel(status: "draft" | "running" | "done" | "failed", steps
 
 /** Verbs and objects for the write tools that need a yes. */
 const TOOL_ACTION: Record<string, [verb: string, object: string]> = {
+  add_zoom: ["Add", "zoom"],
+  add_overlay: ["Add", "callout"],
+  set_motion: ["Retune", "camera"],
+  remove_zoom: ["Remove", "zoom"],
   replace_audio: ["Replace", "audio"],
   export_overwrite: ["Overwrite", "export"],
   delete_takes: ["Delete", "takes"],

@@ -22,6 +22,8 @@ test("derived labels name what happens", () => {
   assert.deepEqual(approvalLabels("mcp__spontaneous__replace_audio"), { approve: "Replace audio", deny: "Keep current" });
   assert.deepEqual(approvalLabels("delete_takes", 3), { approve: "Delete 3 takes", deny: "Keep takes" });
   assert.deepEqual(approvalLabels("unknown_tool"), { approve: "Approve", deny: "Deny" });
+  assert.deepEqual(approvalLabels("add_zoom"), { approve: "Add zoom", deny: "Keep current" });
+  assert.deepEqual(approvalLabels("set_motion"), { approve: "Retune camera", deny: "Keep current" });
   assert.equal(permissionLabel("once"), "Allow once");
   assert.equal(permissionLabel("timed"), "Allow for an hour");
   assert.equal(permissionLabel("timed", 30), "Allow for 30 min");

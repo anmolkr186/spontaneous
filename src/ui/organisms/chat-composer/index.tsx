@@ -21,7 +21,7 @@ import { ArrowUp, Image, Mic, Paperclip, Plus, Square, SquareDashed, StickyNote,
 import { Fold, IconKey, Key, Meter, Swap } from "@/ui/atoms";
 import { Tooltip } from "@/ui/base/tooltip/tooltip";
 import { ModelPicker, CLAUDE_MODELS } from "@/ui/molecules/model-picker";
-import type { Effort, PickerModel } from "@/ui/molecules/model-picker";
+import type { Effort, EffortOption, PickerModel } from "@/ui/molecules/model-picker";
 import { NotePin } from "@/ui/organisms/agent";
 import { formatTime } from "@/editor/model";
 import { blurIn } from "@/ui/tokens/motion";
@@ -96,6 +96,18 @@ export interface ChatComposerProps {
   dictation?: string;
   /** Placeholder of the field. */
   placeholder?: string;
+  /** Extended thinking, when the host controls it. */
+  thinking?: boolean;
+  onThinkingChange?: (on: boolean) => void;
+  /** Thinking effort, when the host controls it; one of `efforts`. */
+  effort?: Effort;
+  onEffortChange?: (effort: Effort) => void;
+  /** The effort levels to offer in the model picker. */
+  efforts?: EffortOption[];
+  /** Offer dictation. Off until real speech-to-text is wired, so it never simulates words. */
+  voice?: boolean;
+  /** Small things in the control row before the model picker, e.g. context usage. */
+  meta?: ReactNode;
   className?: string;
 }
 
@@ -131,6 +143,7 @@ export function ChatComposer({
   models = CLAUDE_MODELS, model, defaultModel, onModelChange,
   listening, onListeningChange, transcript, dictation = "Cut the pause before the share dialog and zoom on the invite link",
   placeholder = "Describe an edit, or ask about the recording…", className,
+  thinking: thinkingProp, onThinkingChange, effort: effortProp, onEffortChange, efforts, voice = true, meta,
 }: ChatComposerProps) {
   const reduce = useReducedMotion();
   const field = useRef<HTMLTextAreaElement>(null);
@@ -146,8 +159,13 @@ export function ChatComposer({
   const setItems = (next: ComposerAttachment[]) => { if (attachments === undefined) setAttachState(next); onAttachmentsChange?.(next); };
 
   const [modelState, setModelState] = useState(() => defaultModel ?? models[0]?.id ?? "auto");
-  const [thinking, setThinking] = useState(false);
-  const [effort, setEffort] = useState<Effort>("medium");
+  // Thinking and effort follow the host when it controls them (the app passes the CLI's choice).
+  const [thinkingState, setThinkingState] = useState(false);
+  const [effortState, setEffortState] = useState<Effort>("medium");
+  const thinking = thinkingProp ?? thinkingState;
+  const effort = effortProp ?? effortState;
+  const setThinking = (on: boolean) => { if (thinkingProp === undefined) setThinkingState(on); onThinkingChange?.(on); };
+  const setEffort = (e: Effort) => { if (effortProp === undefined) setEffortState(e); onEffortChange?.(e); };
 
   const [status, setStatus] = useState("");
   const announce = (s: string) => setStatus((old) => (old === s ? `${s} ` : s));
@@ -301,14 +319,17 @@ export function ChatComposer({
           </Swap>
         </span>
 
+        {meta}
         <ModelPicker models={models} value={model ?? modelState} side="top" align="end"
           onChange={(id) => { setModelState(id); onModelChange?.(id); }}
-          thinking={thinking} onThinkingChange={setThinking} effort={effort} onEffortChange={setEffort} />
+          thinking={thinking} onThinkingChange={setThinking} effort={effort} onEffortChange={setEffort} efforts={efforts} />
 
-        <IconKey label={isListening ? "Keep what you said" : "Dictate"} tooltip="top" variant="tertiary"
-          pressed={isListening} className={styles.mic} data-listening={isListening || undefined} onClick={toggleListening}>
-          <Mic />
-        </IconKey>
+        {voice && (
+          <IconKey label={isListening ? "Keep what you said" : "Dictate"} tooltip="top" variant="tertiary"
+            pressed={isListening} className={styles.mic} data-listening={isListening || undefined} onClick={toggleListening}>
+            <Mic />
+          </IconKey>
+        )}
 
         <IconKey label={running ? "Stop" : "Send"} shortcut={running ? undefined : "↵"} tooltip="top" variant={isListening ? "secondary" : running ? "primary" : sendRole}
           className={styles.send} disabled={!running && !canSend} onClick={running ? onStop : send}>

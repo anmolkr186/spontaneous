@@ -14,10 +14,10 @@ Nothing open right now.
   - The agent UI catalog relies on tools the server doesn't serve yet: `propose_plan`, `propose_text_edit`, `request_permission`, `try_variants`, `suggest_shot`, `answer_with_moments`, `reply_to_note`. `ask_user` and `resolve_annotation` exist.
   - Each tool may carry an optional `cta` field, with labels checked by `src/ui/cta/validate.ts`.
   - Spec: `docs/AGENT_UI.md` (generated from `src/ui/agent-ui/catalog.ts`). Build these with the MCP server in phase 4 (`docs/ARCHITECTURE.md` §7).
-- **Wire the new agent components into the editor** (2026-10-30, reaffirmed 2026-11-06)
-  - The 26 agent components live in the library and docs only. The editor's agent panel still uses the original thread parts.
-  - Wire them component by component, following the "Choosing" rules in `docs/AGENT_UI.md`.
-  - Already wired: CTA regions, the Notes Apply key, the suggestion chip, Send, and Export.
+- **Agent pieces the app can't do yet** (2026-11-06)
+  - `cut`, `set_speed` and `trim` aren't store commands, so plan steps using them fail honestly with Retry (`src/editor/apply.ts` `NOT_YET`). The prompt tells the agent not to propose them.
+  - Dictation: the composer's voice key is off in the app (`voice={false}`) until there's real speech input.
+  - Context window: figures are estimates where the CLI doesn't report them, and Compact sends `/compact`, which hasn't been checked against the CLI in stream-json mode.
 - **Remove the fixed label props** (2026-11-06)
   - `approveLabel`, `denyLabel` (ApprovalCard) and `action.label` (CitedAnswer) stay as aliases for one release, then go. Labels come from `tool`, `count`, `edits` and `cta`.
 - **Promote the duplicated helpers** (2026-11-06)
@@ -76,6 +76,16 @@ Nothing open right now.
   - Chosen over a light face with a red label, and over a key with a red label.
 
 ### Agent
+- **The agent components are wired into the editor's agent panel** (2026-11-06)
+  - Thread parts, the Chat composer, Model picker, Agent steering, Agent monitor, Toaster, the ⌘K Command menu, a Changes tab (Agent ledger and Agent checkpoints) and the Context window, following the Choosing rules in `docs/AGENT_UI.md`.
+- **Until the MCP tools exist, the live agent brings up components with UI blocks in its reply** (2026-11-06)
+  - A fenced ```` ```spontaneous <tool> ```` block holding the tool's JSON becomes a tool-call part of the same shape an MCP tool will produce, so moving to real tools only changes the trigger. Parser: `src/editor/agent-stream.ts`, tested against real CLI captures (`npm run test:agent`).
+  - The system prompt is generated from the catalog (`scripts/agent-prompt.ts` → `src-tauri/src/agent_prompt.txt`, embedded by `agent.rs`), so what the agent is told and what the app parses can't drift.
+  - Answers go back as a short line plus `<spontaneous-answer tool id>{json}</spontaneous-answer>`.
+- **The app applies agent-proposed edits only when the person runs them** (2026-11-06)
+  - Plan steps go through the store's undoable commands, are recorded in the ledger, and save a checkpoint. The Autonomy dial decides which steps ask first: always, only risky ones (`set_shot`, `remove_zoom`), or none.
+- **The built app can play a demo run** (2026-11-06)
+  - From the agent panel's ⋯ menu or ⌘K. It's scripted (`src/editor/demo-run.ts`), never calls Claude Code, and shows every block component, applying real edits.
 - **The agent is the user's Claude Code CLI over stream-json, acting only through our MCP tools** (2026-10-30)
   - `docs/ARCHITECTURE.md` §7.
 - **The agent UI catalog is the single source for which component renders which moment of a run** (2026-11-06)
