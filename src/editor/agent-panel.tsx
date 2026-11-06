@@ -62,9 +62,6 @@ function withAttachments(text: string, attachments: ComposerAttachment[]): strin
   return [text, ...lines].filter(Boolean).join("\n");
 }
 
-/** Codex is offered ahead of its host: the menu says so. */
-const PANEL_HARNESSES = HARNESSES.map((h) => (h.id === "codex" ? { ...h, note: "Can't run here yet" } : h));
-
 export function AgentComposerBar() {
   const running = useAgent((s) => s.running);
   const catalog = useAgent((s) => s.catalog);
@@ -73,6 +70,7 @@ export function AgentComposerBar() {
   const harness = useAgent((s) => s.harness);
   const codexModel = useAgent((s) => s.codexModel);
   const codexEffort = useAgent((s) => s.codexEffort);
+  const codexCatalog = useAgent((s) => s.codexCatalog);
   const time = useEditor((s) => s.time);
   const { send, cancel, setModelChoice, setEffortChoice, setHarness, setCodexModel, setCodexEffort } = useAgent.getState();
   const codex = harness === "codex";
@@ -85,8 +83,10 @@ export function AgentComposerBar() {
   const current = catalog?.find((m) => m.value === claudeModel);
   const claudeLevels = current ? (current.supportsEffort === false ? [] : current.supportedEffortLevels ?? []) : AGENT_EFFORTS.map((e) => e.value);
 
-  const codexPicked = CODEX_MODELS.find((m) => m.value === codexModel) ?? CODEX_MODELS[0]!;
-  const models: PickerModel[] = codex ? CODEX_MODELS.map((m) => ({ id: m.value, name: m.label, description: m.description })) : claudeModels;
+  // Codex: what the installed CLI lists; until it answers, the list it gave when this was written.
+  const codexList = codexCatalog?.map((m) => ({ value: m.value, label: m.displayName, description: m.description ?? "", efforts: m.supportedEffortLevels ?? [] })) ?? CODEX_MODELS;
+  const codexPicked = codexList.find((m) => m.value === codexModel) ?? codexList[0]!;
+  const models: PickerModel[] = codex ? codexList.map((m) => ({ id: m.value, name: m.label, description: m.description })) : claudeModels;
   const levels = codex ? codexPicked.efforts : claudeLevels;
   const efforts: EffortOption[] = levels.map((l) => ({ value: l, label: effortLabel(l) }));
   const effort = codex ? codexEffort : effortChoice ?? preferredEffort(levels) ?? "";
@@ -110,10 +110,9 @@ export function AgentComposerBar() {
       onSend={(text: string, details: ComposerSendDetails) => send(withAttachments(text, details.attachments))}
       onAttach={onAttach}
       playhead={time}
-      harnesses={PANEL_HARNESSES}
+      harnesses={HARNESSES}
       harness={harness}
       onHarnessChange={(id) => setHarness(id as HarnessId)}
-      sendBlocked={codex ? "Codex can't run here yet" : undefined}
       models={models}
       model={codex ? codexPicked.value : claudeModel}
       onModelChange={(id) => (codex ? setCodexModel(id) : setModelChoice(id))}

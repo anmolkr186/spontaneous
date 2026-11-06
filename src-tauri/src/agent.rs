@@ -1,8 +1,9 @@
-//! Hosts the user's own Claude Code CLI as a child process.
+//! Hosts the user's own agent CLI as a child process: Claude Code, or Codex
+//! (`codex.rs`), whichever the composer is set to.
 //!
-//! Sign-in belongs to the CLI: it runs Anthropic's browser flow and keeps the
-//! login in the Keychain. This module never sees or stores a credential. It
-//! only starts `claude`, writes stream-json to stdin and forwards stdout.
+//! Sign-in belongs to the CLI: it runs the provider's browser flow and keeps
+//! the login itself. This module never sees or stores a credential. For Claude
+//! Code it only starts `claude`, writes stream-json to stdin and forwards stdout.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -13,6 +14,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
+use crate::codex::{self, CodexSession};
 
 /// These would outrank the plan login, and in `-p` mode an API key is used
 /// without asking, so a stray key in the environment would bill the key. The
@@ -44,8 +46,23 @@ const STDERR_LINES: usize = 20;
 
 #[derive(Default)]
 pub struct AgentState {
-  session: Mutex<Option<Session>>,
+  session: Mutex<Option<Live>>,
   login: Mutex<Option<Child>>,
+}
+
+/// The running conversation, on whichever harness started it.
+enum Live {
+  Claude(Session),
+  Codex(CodexSession),
+}
+
+impl Live {
+  fn stop(self) {
+    match self {
+      Live::Claude(session) => stop_session(session),
+      Live::Codex(session) => session.stop(),
+    }
+  }
 }
 
 struct Session {
@@ -60,6 +77,9 @@ pub struct SessionOptions {
   resume: Option<String>,
   model: Option<String>,
   effort: Option<String>,
+  /// "codex" runs Codex; anything else, or nothing, runs Claude Code.
+  #[serde(default)]
+  harness: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -214,13 +234,38 @@ pub async fn agent_status() -> Result<AgentStatus, String> {
 #[tauri::command]
 pub async fn agent_login(app: AppHandle) -> Result<(), String> {
   let path = find_cli().ok_or("Claude Code isn't installed")?;
-  let mut child = cli(&path)
+  let child = cli(&path)
     .args(["auth", "login", "--claudeai"])
     .stdin(Stdio::null())
     .stdout(Stdio::null())
     .stderr(Stdio::null())
     .spawn()
     .map_err(|e| format!("Couldn't start sign-in: {e}"))?;
+  wait_for_login(app, child).await
+}
+
+/// What the app knows about the user's own Codex CLI. It never holds a credential.
+#[tauri::command]
+pub async fn codex_status() -> Result<codex::CodexStatus, String> {
+  tauri::async_runtime::spawn_blocking(codex::status).await.map_err(|e| e.to_string())
+}
+
+/// Runs `codex login`, which opens OpenAI's page in the browser.
+#[tauri::command]
+pub async fn codex_login(app: AppHandle) -> Result<(), String> {
+  let path = codex::find_cli().ok_or("Codex isn't installed")?;
+  let child = codex::login(&path)?;
+  wait_for_login(app, child).await
+}
+
+#[tauri::command]
+pub async fn codex_models() -> Result<Value, String> {
+  let path = codex::find_cli().ok_or("Codex isn't installed")?;
+  tauri::async_runtime::spawn_blocking(move || codex::models(&path)).await.map_err(|e| e.to_string())?
+}
+
+/// Waits for a CLI's sign-in to finish. One sign-in at a time: a new one replaces a sign-in left waiting.
+async fn wait_for_login(app: AppHandle, mut child: Child) -> Result<(), String> {
   let previous = app.state::<AgentState>().login.lock().unwrap().take();
   if let Some(mut previous) = previous {
     let _ = previous.kill();
@@ -248,30 +293,39 @@ pub async fn agent_login(app: AppHandle) -> Result<(), String> {
   }).await.map_err(|e| e.to_string())?
 }
 
-/// Starts a session, replacing any running one.
+/// Starts a session, replacing any running one. Codex starts nothing until the
+/// first message: each of its messages is a process of its own.
 #[tauri::command]
 pub async fn agent_connect(app: AppHandle, state: State<'_, AgentState>, options: SessionOptions, on_event: Channel<Vec<Value>>) -> Result<(), String> {
-  let path = find_cli().ok_or("Claude Code isn't installed")?;
   let cwd = app.path().app_data_dir().map_err(|e| e.to_string())?.join("agent");
   std::fs::create_dir_all(&cwd).map_err(|e| e.to_string())?;
-  let session = spawn_session(&path, &cwd, &options, move |batch| { let _ = on_event.send(batch); })?;
+  let session = if options.harness.as_deref() == Some("codex") {
+    let path = codex::find_cli().ok_or("Codex isn't installed")?;
+    let on_batch: codex::OnBatch = Arc::new(move |batch| { let _ = on_event.send(batch); });
+    Live::Codex(CodexSession::new(path, cwd, options.resume, options.model, options.effort, SYSTEM_PROMPT, on_batch))
+  } else {
+    let path = find_cli().ok_or("Claude Code isn't installed")?;
+    Live::Claude(spawn_session(&path, &cwd, &options, move |batch| { let _ = on_event.send(batch); })?)
+  };
   let previous = state.session.lock().unwrap().replace(session);
   if let Some(previous) = previous {
-    std::thread::spawn(move || stop_session(previous));
+    std::thread::spawn(move || previous.stop());
   }
   Ok(())
 }
 
 #[tauri::command]
 pub fn agent_send(state: State<'_, AgentState>, text: String) -> Result<(), String> {
-  let mut session = state.session.lock().unwrap();
-  write_message(session.as_mut().ok_or("Claude Code isn't running")?, &text)
+  match state.session.lock().unwrap().as_mut().ok_or("The agent isn't running")? {
+    Live::Claude(session) => write_message(session, &text),
+    Live::Codex(session) => session.send(&text),
+  }
 }
 
 #[tauri::command]
 pub fn agent_stop(state: State<'_, AgentState>) {
   if let Some(session) = state.session.lock().unwrap().take() {
-    std::thread::spawn(move || stop_session(session));
+    std::thread::spawn(move || session.stop());
   }
 }
 
@@ -390,7 +444,7 @@ fn update_failure(stdout: &[u8], stderr: &[u8]) -> String {
 pub fn shutdown(app: &AppHandle) {
   let state = app.state::<AgentState>();
   if let Some(session) = state.session.lock().unwrap().take() {
-    stop_session(session);
+    session.stop();
   }
   if let Some(mut login) = state.login.lock().unwrap().take() {
     let _ = login.kill();
@@ -472,7 +526,7 @@ mod tests {
     let session_id = init["session_id"].as_str().unwrap().to_string();
     stop_session(session);
     let (tx, rx) = mpsc::channel::<Value>();
-    let options = SessionOptions { resume: Some(session_id.clone()), model: Some("sonnet".into()), effort: Some("low".into()) };
+    let options = SessionOptions { resume: Some(session_id.clone()), model: Some("sonnet".into()), effort: Some("low".into()), harness: None };
     let mut session = spawn_session(&path, &cwd, &options, move |batch| {
       for event in batch {
         let _ = tx.send(event);

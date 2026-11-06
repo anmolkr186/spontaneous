@@ -106,7 +106,6 @@ export const entry: DocEntry = {
     { name: "models / model / defaultModel / onModelChange", type: "PickerModel[] / string / string / (id) => void", description: "Passed to the ModelPicker in the row. Effort is kept inside unless controlled, and handed to onSend." },
     { name: "harnesses / harness / onHarnessChange", type: "Harness[] / string / (id) => void", description: "Turns the picker into a segmented key whose left segment switches harness, e.g. Claude Code and Codex." },
     { name: "effort / onEffortChange / efforts", type: "Effort / (effort) => void / EffortOption[]", description: "The effort ladder in the model menu, lowest first. Empty hides it." },
-    { name: "sendBlocked", type: "string", description: "Why Send can't run, e.g. the harness isn't wired. Send stays off and its tooltip says this; the text stays." },
     { name: "listening / onListeningChange", type: "boolean / (on) => void", description: "Dictation on, controlled or not. Stopping keeps the words; Esc drops them." },
     { name: "transcript", type: "{ final: string; interim: string }", description: "Words from your speech recognizer while listening. Without it, a simulated take of dictation plays word by word." },
     { name: "dictation", type: "string", description: "The sentence a simulated take plays." },

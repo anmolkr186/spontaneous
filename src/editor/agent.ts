@@ -6,9 +6,10 @@ import { useEditor } from "./store";
 import { isTauri } from "@/platform/tauri";
 import { SHOTS, shotById } from "./shots";
 import type { Shot } from "./shots";
-import { agent } from "@/platform/agent";
+import { agent, codex } from "@/platform/agent";
 import type { AgentEvent, AgentModel } from "@/platform/agent";
 import { AGENT_MODELS, CODEX_MODELS, finalizeBlocks, isDefaultEntry, modelName, preferredEffort, recommendedModel, reduceParts } from "./agent-stream";
+import { HARNESS_NAMES } from "./agent-stream";
 import type { HarnessId } from "./agent-stream";
 import { applyStep, runUndo, stepName, stepRange, stepRisk, STEP_TOOLS } from "./apply";
 import type { ProposedStep, UndoRecord } from "./apply";
@@ -27,9 +28,10 @@ function parseShotRequest(text: string): { shot?: Shot; speed?: number; amount?:
 }
 
 /**
- * In the app, runs go to the user's Claude Code CLI: Rust spawns it, batches
- * stdout every 16 ms onto a Channel, and this store folds stream-json events
- * into thread messages. It has no edit tools yet, so a run can only reply.
+ * In the app, runs go to the user's own agent CLI, Claude Code or Codex: Rust
+ * spawns it, batches stdout every 16 ms onto a Channel, and this store folds
+ * stream-json events into thread messages (Rust translates Codex's events into
+ * the same shapes). It has no edit tools yet, so a run can only reply.
  *
  * In a plain browser there's no CLI, so runs are scripted against the same
  * message shapes and the UI can be built without one.
@@ -57,7 +59,7 @@ export interface QueuedRun {
 /** A note as the thread shows it: its pin number and text, so the thread never reads the project. */
 export type NoteRef = { id: string; index: number; at: number; text: string };
 
-/** Where the connection to the user's Claude Code stands. The app never holds the login itself. */
+/** Where the connection to the chosen harness's CLI stands. The app never holds the login itself. */
 export type AgentConnection =
   | { phase: "checking" | "missing" | "signed-out" }
   | { phase: "signing-in"; error?: string }
@@ -77,9 +79,11 @@ interface AgentState {
   /** Takes effect from the next message, on the same conversation. */
   setModelChoice: (value: string) => void;
   setEffortChoice: (value: string | null) => void;
-  /** Which harness the composer is set to. Only Claude Code runs; Codex is picked ahead of its host. */
+  /** Which CLI runs the agent. Switching checks that CLI's connection; each keeps its own conversation. */
   harness: HarnessId;
   setHarness: (harness: HarnessId) => void;
+  /** What the installed Codex lists. Null until asked, or if it can't say. */
+  codexCatalog: AgentModel[] | null;
   /** Codex's model and effort, kept apart from Claude's so switching back and forth keeps both. */
   codexModel: string;
   codexEffort: string;
@@ -130,8 +134,10 @@ interface AgentState {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let runToken = 0;
 
-/** The CLI session, kept so a stopped run can be resumed. A new generation disowns the old process's events. */
-let sessionId: string | null = null;
+/** Each harness's conversation, kept so a stopped run, or a switch back, resumes it. A new generation disowns the old process's events. */
+const sessionIds: Record<HarnessId, string | null> = { "claude-code": null, codex: null };
+/** The harness the open session runs on, so its events land under the right conversation. */
+let sessionHarness: HarnessId = "claude-code";
 let sessionOpen = false;
 let sessionGeneration = 0;
 /** Runs when the current live run ends, however it ends. */
@@ -159,13 +165,13 @@ function loadChoices(): Choices {
   const str = (v: unknown) => (typeof v === "string" && v ? v : null);
   // A choice saved as the CLI's "default" from before the app dropped it gets resolved like no choice.
   const model = str(saved.modelChoice);
-  const codex = CODEX_MODELS.find((m) => m.value === saved.codexModel) ?? CODEX_MODELS[0]!;
+  // Codex's list arrives from the CLI later and may hold models this app doesn't know, so its choices are kept as saved.
   return {
     modelChoice: model && !isDefaultEntry(model) ? model : isTauri ? null : recommendedModel(null),
     effortChoice: str(saved.effortChoice) ?? "medium",
     harness: saved.harness === "codex" ? "codex" : "claude-code",
-    codexModel: codex.value,
-    codexEffort: codex.efforts.includes(str(saved.codexEffort) ?? "") ? str(saved.codexEffort)! : preferredEffort(codex.efforts)!,
+    codexModel: str(saved.codexModel) ?? CODEX_MODELS[0]!.value,
+    codexEffort: str(saved.codexEffort) ?? "medium",
   };
 }
 
@@ -336,8 +342,11 @@ export const useAgent = create<AgentState>((set, get) => {
     const token = runToken;
     for (const event of events) {
       if (event.type === "system" && event.subtype === "init") {
-        sessionId = event.session_id as string;
-        set({ model: modelName(event.model as string), billedElsewhere: event.apiKeySource !== "none" });
+        sessionIds[sessionHarness] = event.session_id as string;
+        const id = event.model as string;
+        // Codex's billing is known from its login status, not from the event.
+        if (sessionHarness === "codex") set({ model: get().codexCatalog?.find((m) => m.value === id)?.displayName ?? id });
+        else set({ model: modelName(id), billedElsewhere: event.apiKeySource !== "none" });
       } else if (event.type === "stream_event" || event.type === "assistant") {
         if (get().running) patchLast((m) => ({ ...m, content: reduceParts(m.content as Part[], event) }));
       } else if (event.type === "result") {
@@ -345,15 +354,16 @@ export const useAgent = create<AgentState>((set, get) => {
         if (u) set({ usage: { input: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), cacheRead: u.cache_read_input_tokens ?? 0, output: u.output_tokens ?? 0, cost: Number(event.total_cost_usd ?? 0) } });
         if (!get().running) continue;
         const failed = event.is_error === true;
-        endLiveRun(token, failed ? String(event.result ?? "Claude Code couldn't finish that.") : undefined);
+        endLiveRun(token, failed ? String(event.result ?? `${HARNESS_NAMES[sessionHarness]} couldn't finish that.`) : undefined);
         if (failed) void get().checkConnection();
       } else if (event.type === "agent_exit") {
         sessionOpen = false;
         if (get().running) {
           // It may have died resuming, so the next message starts a fresh session rather than failing the same way.
-          sessionId = null;
+          sessionIds[sessionHarness] = null;
+          const name = HARNESS_NAMES[sessionHarness];
           const detail = String(event.stderr ?? "").trim().split("\n").at(-1);
-          endLiveRun(token, detail ? `Claude Code stopped: ${detail}` : "Claude Code stopped before it replied.");
+          endLiveRun(token, detail ? `${name} stopped: ${detail}` : `${name} stopped before it replied.`);
           void get().checkConnection();
         }
       }
@@ -366,8 +376,12 @@ export const useAgent = create<AgentState>((set, get) => {
       try {
         if (!sessionOpen || sessionStale) {
           const generation = ++sessionGeneration;
-          const { modelChoice, effortChoice } = get();
-          await agent.connect({ resume: sessionId, model: modelChoice, effort: effortChoice }, (events) => onEvents(events, generation));
+          const { harness, modelChoice, effortChoice, codexModel, codexEffort } = get();
+          sessionHarness = harness;
+          const options = harness === "codex"
+            ? { resume: sessionIds.codex, model: codexModel, effort: codexEffort, harness }
+            : { resume: sessionIds["claude-code"], model: modelChoice, effort: effortChoice, harness };
+          await agent.connect(options, (events) => onEvents(events, generation));
           sessionOpen = true;
           sessionStale = false;
         }
@@ -659,11 +673,13 @@ export const useAgent = create<AgentState>((set, get) => {
   };
 
   /** Runs need a signed-in CLI. If there isn't one, show the sign-in card instead of queuing. */
-  /** Only Claude Code runs today. With Codex picked, say so instead of running Claude behind its back. */
-  const runnable = () => {
-    if (get().harness === "claude-code") return true;
-    toast("Codex can't run here yet", { description: "Switch to Claude Code in the composer to send." });
-    return false;
+  /** Asks Codex for its models. A saved model it no longer lists moves to its first; the effort follows. */
+  const loadCodexCatalog = async () => {
+    const codexCatalog = await codex.models().catch(() => undefined);
+    if (!codexCatalog?.length) return;
+    set({ codexCatalog });
+    const { codexModel } = get();
+    get().setCodexModel(codexCatalog.some((m) => m.value === codexModel) ? codexModel : codexCatalog[0]!.value);
   };
 
   const connected = () => {
@@ -698,24 +714,38 @@ export const useAgent = create<AgentState>((set, get) => {
       saveChoices({ modelChoice: get().modelChoice, effortChoice });
     },
 
-    setHarness: (harness) => { set({ harness }); saveChoices({ harness }); },
+    setHarness: (harness) => {
+      if (harness === get().harness) return;
+      sessionStale = true;
+      set({ harness, model: null, billedElsewhere: false, connection: isTauri ? { phase: "checking" } : get().connection });
+      saveChoices({ harness });
+      void get().checkConnection();
+    },
+    codexCatalog: null,
     setCodexModel: (codexModel) => {
-      const levels = CODEX_MODELS.find((m) => m.value === codexModel)?.efforts ?? [];
+      sessionStale = true;
+      const listed = get().codexCatalog?.find((m) => m.value === codexModel);
+      const levels = listed ? listed.supportedEffortLevels ?? [] : CODEX_MODELS.find((m) => m.value === codexModel)?.efforts ?? [];
       const codexEffort = levels.includes(get().codexEffort) ? get().codexEffort : preferredEffort(levels) ?? get().codexEffort;
       set({ codexModel, codexEffort });
       saveChoices({ codexModel, codexEffort });
     },
-    setCodexEffort: (codexEffort) => { set({ codexEffort }); saveChoices({ codexEffort }); },
+    setCodexEffort: (codexEffort) => { sessionStale = true; set({ codexEffort }); saveChoices({ codexEffort }); },
 
     checkConnection: async () => {
       if (!isTauri) return;
-      const status = await agent.status();
-      if (!status) return;
-      set({ cliVersion: status.version });
+      const harness = get().harness;
+      const status = harness === "codex" ? await codex.status() : await agent.status();
+      // A switch while this was checking has its own check.
+      if (!status || harness !== get().harness) return;
+      if (harness === "claude-code") set({ cliVersion: status.version });
+      // A Codex signed in with an API key bills the key, not the ChatGPT plan.
+      else set({ billedElsewhere: status.subscription === "api-key" });
       if (!status.installed) set({ connection: { phase: "missing" } });
       else if (status.loggedIn) {
         set({ connection: { phase: "ready", plan: status.subscription } });
-        if (!get().catalog) void get().loadCatalog();
+        if (harness === "claude-code" && !get().catalog) void get().loadCatalog();
+        if (harness === "codex" && !get().codexCatalog) void loadCodexCatalog();
       }
       // A sign-in still open in the browser keeps its card until it finishes.
       else if (get().connection.phase !== "signing-in") set({ connection: { phase: "signed-out" } });
@@ -725,7 +755,7 @@ export const useAgent = create<AgentState>((set, get) => {
       const attempt = ++signInAttempt;
       set({ connection: { phase: "signing-in" } });
       try {
-        await agent.login();
+        await (get().harness === "codex" ? codex.login() : agent.login());
       } catch (error) {
         if (attempt === signInAttempt) set({ connection: { phase: "signing-in", error: String(error) } });
         return;
@@ -752,7 +782,8 @@ export const useAgent = create<AgentState>((set, get) => {
 
     reset: () => {
       get().cancel();
-      sessionId = null;
+      sessionIds["claude-code"] = null;
+      sessionIds.codex = null;
       set({ messages: [] });
     },
 
@@ -789,10 +820,10 @@ export const useAgent = create<AgentState>((set, get) => {
       });
     },
 
-    send: (text) => { if (connected() && runnable()) enqueue({ id: uid("q"), label: text, text }); },
+    send: (text) => { if (connected()) enqueue({ id: uid("q"), label: text, text }); },
 
     applyNotes: (noteIds) => {
-      if (!connected() || !runnable()) return;
+      if (!connected()) return;
       const editor = useEditor.getState();
       const notes = editor.project.notes.filter((n) => n.status === "open" && (!noteIds || noteIds.includes(n.id)));
       if (!notes.length) return;

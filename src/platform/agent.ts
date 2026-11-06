@@ -1,7 +1,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { call } from "./tauri";
 
-/** What the app knows about the user's own Claude Code CLI. It never holds a credential. */
+/** What the app knows about the user's own agent CLI. It never holds a credential. For Codex, `subscription` is "chatgpt" or "api-key". */
 export interface AgentStatus {
   installed: boolean;
   version: string | null;
@@ -17,6 +17,8 @@ export interface AgentSessionOptions {
   resume: string | null;
   model: string | null;
   effort: string | null;
+  /** Which CLI runs it. */
+  harness: "claude-code" | "codex";
 }
 
 /** One model as the installed CLI describes it. `value` is what `--model` takes. */
@@ -46,4 +48,13 @@ export const agent = {
   /** Runs the CLI's own updater. Check the version afterwards: a clean exit doesn't prove it installed anything. */
   update: () => call<void>("agent_update"),
   stop: () => call<void>("agent_stop"),
+};
+
+/** The user's own Codex CLI. Sessions go through `agent.connect` with `harness: "codex"`. */
+export const codex = {
+  status: () => call<AgentStatus>("codex_status"),
+  /** Opens OpenAI's sign-in page through the CLI. Resolves when the CLI finishes. */
+  login: () => call<void>("codex_login"),
+  /** The models and reasoning levels the installed CLI lists. Costs no plan usage. */
+  models: () => call<AgentModel[]>("codex_models"),
 };

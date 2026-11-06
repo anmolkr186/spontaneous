@@ -485,7 +485,7 @@ export const SURFACES: AgentSurface[] = [
     from: "@/ui/molecules/model-picker",
     moment: "Choosing which harness runs the agent (Claude Code or Codex), which model it uses and how hard it thinks.",
     trigger: { source: "stream", event: "system init (model) · app setting" },
-    agentSays: "(not triggered by the agent) The chosen model and effort are passed as --model and --effort on the next run. There is no default entry: a model and an effort are always picked. Only Claude Code runs today; with Codex picked, Send stays off and says so.",
+    agentSays: "(not triggered by the agent) The chosen model and effort are passed as --model and --effort on the next run. There is no default entry: a model and an effort are always picked. With Codex picked, the same prompt goes to `codex exec` as developer instructions, the model as -m and the effort as model_reasoning_effort.",
     payload: `{ "type": "system", "subtype": "init", "model": "claude-sonnet-5-5" }`,
     props: "value from init.model; onChange restarts the agent with the new model on the next turn.",
   },

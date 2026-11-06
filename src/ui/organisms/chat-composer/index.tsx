@@ -83,8 +83,6 @@ export interface ChatComposerProps {
   harness?: string;
   /** Called with the picked harness's id. */
   onHarnessChange?: (id: string) => void;
-  /** Why Send can't run right now, e.g. the chosen harness isn't wired. Send stays off and says this; the text stays. */
-  sendBlocked?: string;
   /** Models for the picker. Default: the current Claude models. */
   models?: PickerModel[];
   /** Chosen model (controlled). */
@@ -156,7 +154,7 @@ function Chip({ item, onRemove }: { item: ComposerAttachment; onRemove: () => vo
 export function ChatComposer({
   value, defaultValue = "", onChange, onSend, running = false, onStop,
   attachments, defaultAttachments = [], onAttachmentsChange, onAttach, playhead = 0,
-  harnesses, harness, onHarnessChange, sendBlocked,
+  harnesses, harness, onHarnessChange,
   models = CLAUDE_MODELS, model, defaultModel, onModelChange,
   listening, onListeningChange, transcript, dictation = "Cut the pause before the share dialog and zoom on the invite link",
   placeholder = "Describe an edit, or ask about the recording…", className,
@@ -252,7 +250,7 @@ export function ChatComposer({
   const remove = (id: string) => { setItems(items.filter((a) => a.id !== id)); field.current?.focus(); };
 
   /* Send */
-  const canSend = !running && !isListening && !sendBlocked && (text.trim().length > 0 || items.length > 0);
+  const canSend = !running && !isListening && (text.trim().length > 0 || items.length > 0);
   // Send competes for the panel's primary: a decision waiting elsewhere on the panel outranks it.
   const sendRole = useCtaRole("run", canSend);
   const send = () => {
@@ -355,7 +353,7 @@ export function ChatComposer({
           </IconKey>
         )}
 
-        <IconKey label={running ? "Stop" : sendBlocked ?? "Send"} shortcut={running || sendBlocked ? undefined : "↵"} tooltip="top" variant={isListening ? "secondary" : running ? "primary" : sendRole}
+        <IconKey label={running ? "Stop" : "Send"} shortcut={running ? undefined : "↵"} tooltip="top" variant={isListening ? "secondary" : running ? "primary" : sendRole}
           className={styles.send} disabled={!running && !canSend} onClick={running ? onStop : send}>
           <Swap id={running ? "stop" : "send"}>{running ? <Square className={styles.stopGlyph} /> : <ArrowUp />}</Swap>
         </IconKey>

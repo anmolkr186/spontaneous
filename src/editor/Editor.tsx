@@ -29,6 +29,7 @@ import type { EditorMode, InspectorTab } from "./store";
 import { useAgent } from "./agent";
 import { useAgentUpdate } from "./agent-update";
 import { AgentAbove, AgentComposerBar, AgentMenu, useAgentActions } from "./agent-panel";
+import { HARNESS_NAMES } from "./agent-stream";
 import { ChangesPane } from "./ChangesPane";
 import { CommandPalette } from "./CommandPalette";
 import { CtaKey, CtaRegion, CtaRoot, exportLabel, notesLabel } from "@/ui/cta";
@@ -725,9 +726,13 @@ function SidePanel() {
 
 function AgentPane() {
   const connection = useAgent((s) => s.connection);
+  const harness = useAgent((s) => s.harness);
   if (connection.phase !== "ready") {
-    const { checkConnection, signIn } = useAgent.getState();
-    return <AgentConnect phase={connection.phase} error={connection.phase === "signing-in" ? connection.error : undefined} onSignIn={signIn} onCheck={checkConnection} />;
+    const { checkConnection, signIn, setHarness } = useAgent.getState();
+    // The card stands in for the composer and its harness key, so it offers the other CLI itself.
+    const other = harness === "codex" ? "claude-code" : "codex";
+    return <AgentConnect phase={connection.phase} cli={harness} error={connection.phase === "signing-in" ? connection.error : undefined} onSignIn={signIn} onCheck={checkConnection}
+      switchTo={{ label: `Use ${HARNESS_NAMES[other]}`, onSelect: () => setHarness(other) }} />;
   }
   return <AgentConversation />;
 }
@@ -736,27 +741,27 @@ function AgentConversation() {
   const harness = useAgent((s) => s.harness);
   const { undo } = useAgent.getState();
   const actions = useAgentActions();
-  const empty = harness === "codex" ? "Codex can't run here yet. Switch to Claude Code in the composer to talk through your notes."
-    : "Talk through your notes with Claude Code. It can't change the timeline yet.";
+  const empty = `Talk through your notes with ${HARNESS_NAMES[harness]}. It can't change the timeline yet.`;
   return (
     <AgentThread
       above={<AgentAbove />}
       composer={<AgentComposerBar />}
       actions={actions}
       onUndo={undo}
-      empty={isTauri || harness === "codex" ? <AgentEmpty>{empty}</AgentEmpty> : undefined}
+      empty={isTauri ? <AgentEmpty>{empty}</AgentEmpty> : undefined}
     />
   );
 }
 
-/** Offers a newer Claude Code once per launch, after the connection check finds the installed one. */
+/** Offers a newer Claude Code once per launch, after the connection check finds the installed one. Codex updates itself. */
 function AgentUpdate() {
   const version = useAgent((s) => s.cliVersion);
+  const harness = useAgent((s) => s.harness);
   const available = useAgentUpdate((s) => s.available);
   const state = useAgentUpdate((s) => s.state);
   const { check, install, dismiss } = useAgentUpdate.getState();
   useEffect(() => { if (version) void check(version); }, [version, check]);
-  if (!available) return null;
+  if (!available || harness !== "claude-code") return null;
   return <CliUpdateNotice installed={available.installed} latest={available.latest} state={state} onUpdate={install} onDismiss={dismiss} />;
 }
 

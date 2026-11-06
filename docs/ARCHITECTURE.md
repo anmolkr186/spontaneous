@@ -203,6 +203,14 @@ Notes look like Flask's time-coded feedback: a pin on the timeline and a card in
 - Run in an app-owned folder, because `-p` otherwise loads hooks and `.mcp.json` from where it runs.
 - Find the CLI in the usual install locations, then through the login shell's `PATH` (apps launched from Finder don't inherit it). Stop it with SIGINT so the session can be resumed, then SIGKILL. It also exits when its stdin closes, so the app can't leave one behind.
 - Stream stdout through a 16 ms batcher into a Channel.
+- **Codex** is the second harness, picked in the composer. The same host runs the user's own `codex` CLI, one process per message:
+  ```
+  codex exec [resume <thread>] --json --ignore-user-config --ignore-rules --skip-git-repo-check
+             --disable <tool features> -c sandbox_mode="read-only" -c web_search="disabled"
+             -c skills.include_instructions=false … -c developer_instructions=<prompt>
+             -m <model> -c model_reasoning_effort=<effort> -
+  ```
+  The prompt comes from stdin. Rust translates its events (`thread.started`, `item.completed`, `turn.completed`, `turn.failed`) into Claude Code's `system/init`, text and thinking blocks and `result`, so the store doesn't care which CLI ran. Sign-in is `codex login`; models come from `codex debug models`, which makes no model request. Code: `src-tauri/src/codex.rs`.
 
 ### MCP tools (rmcp 3.x, served in-process)
 

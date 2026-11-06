@@ -562,7 +562,7 @@ Where the person tells the agent what to change, with frames, regions and notes 
 Choosing which harness runs the agent (Claude Code or Codex), which model it uses and how hard it thinks.
 
 - **Trigger:** stream: system init (model) · app setting
-- **Agent says:** “(not triggered by the agent) The chosen model and effort are passed as --model and --effort on the next run. There is no default entry: a model and an effort are always picked. Only Claude Code runs today; with Codex picked, Send stays off and says so.”
+- **Agent says:** “(not triggered by the agent) The chosen model and effort are passed as --model and --effort on the next run. There is no default entry: a model and an effort are always picked. With Codex picked, the same prompt goes to `codex exec` as developer instructions, the model as -m and the effort as model_reasoning_effort.”
 - **Props:** value from init.model; onChange restarts the agent with the new model on the next turn.
 
 ```js

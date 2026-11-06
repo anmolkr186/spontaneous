@@ -1,5 +1,6 @@
 mod agent;
 mod capture;
+mod codex;
 mod project;
 mod tray;
 mod viewport;
@@ -89,6 +90,9 @@ pub fn run() {
       agent::agent_latest_version,
       agent::agent_update,
       agent::agent_models,
+      agent::codex_status,
+      agent::codex_login,
+      agent::codex_models,
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application");

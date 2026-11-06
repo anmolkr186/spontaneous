@@ -164,12 +164,14 @@ export function preferredEffort(levels: string[]): string | null {
   return levels.includes("medium") ? "medium" : levels[0] ?? null;
 }
 
-/** The harnesses the panel can switch between. Only Claude Code runs today. */
+/** The CLIs the panel can run the agent on. */
 export type HarnessId = "claude-code" | "codex";
 
+export const HARNESS_NAMES: Record<HarnessId, string> = { "claude-code": "Claude Code", codex: "Codex" };
+
 /**
- * Codex's current models, as its CLI lists them. Nothing runs Codex yet, so
- * this is what the picker shows until the Codex host reads them live.
+ * Codex's models as its CLI listed them on 2026-11-06. Used only until the
+ * installed CLI answers (`codex debug models`), and in the browser preview.
  */
 export const CODEX_MODELS: { value: string; label: string; description: string; efforts: string[] }[] = [
   { value: "gpt-6.1-sol", label: "GPT-6.1-Sol", description: "Workhorse for coding and everyday work", efforts: ["low", "medium", "high", "xhigh", "max", "ultra"] },

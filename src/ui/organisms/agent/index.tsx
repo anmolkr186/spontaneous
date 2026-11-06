@@ -81,17 +81,35 @@ export function AgentEmpty({ children = "Leave notes on the frame and the agent 
 
 export interface AgentConnectProps {
   phase: "checking" | "missing" | "signed-out" | "signing-in";
+  /** Which CLI the card is about. */
+  cli?: "claude-code" | "codex";
   error?: string;
   onSignIn: () => void;
   onCheck: () => void;
+  /** Offers the other CLI, so a missing one isn't a dead end: "Use Claude Code". */
+  switchTo?: { label: string; onSelect: () => void };
 }
 
-/** Stands in for the thread until the user's own Claude Code is installed and signed in. */
-export function AgentConnect({ phase, error, onSignIn, onCheck }: AgentConnectProps) {
-  if (phase === "checking") return <div className={styles.empty}><p>Checking for Claude Code…</p></div>;
+const CONNECT_COPY = {
+  "claude-code": {
+    name: "Claude Code",
+    missing: "Spontaneous runs your own copy of Claude Code. Install it from code.claude.com, then check again.",
+    signedOut: "Work through your notes on your own Claude plan. You sign in on Anthropic's page in your browser, and Spontaneous never sees your login.",
+  },
+  codex: {
+    name: "Codex",
+    missing: "Spontaneous runs your own copy of Codex. Install the Codex CLI from developers.openai.com/codex, then check again.",
+    signedOut: "Work through your notes on your own ChatGPT plan. You sign in on OpenAI's page in your browser, and Spontaneous never sees your login.",
+  },
+};
+
+/** Stands in for the thread until the user's own agent CLI is installed and signed in. */
+export function AgentConnect({ phase, cli = "claude-code", error, onSignIn, onCheck, switchTo }: AgentConnectProps) {
+  const words = CONNECT_COPY[cli];
+  if (phase === "checking") return <div className={styles.empty}><p>Checking for {words.name}…</p></div>;
   const copy = {
-    missing: { title: "Install Claude Code", body: "Spontaneous runs your own copy of Claude Code. Install it from code.claude.com, then check again." },
-    "signed-out": { title: "Connect Claude Code", body: "Work through your notes on your own Claude plan. You sign in on Anthropic's page in your browser, and Spontaneous never sees your login." },
+    missing: { title: `Install ${words.name}`, body: words.missing },
+    "signed-out": { title: `Connect ${words.name}`, body: words.signedOut },
     "signing-in": { title: "Finish signing in", body: "Complete the sign-in in your browser, then come back here." },
   }[phase];
   return (
@@ -104,6 +122,7 @@ export function AgentConnect({ phase, error, onSignIn, onCheck }: AgentConnectPr
         {phase === "signed-out" && <Key size="sm" variant="primary" onClick={onSignIn}>Sign in</Key>}
         {phase === "signing-in" && <Key size="sm" variant="tertiary" onClick={onSignIn}>Open sign-in again</Key>}
         {phase !== "signed-out" && <Key size="sm" variant={phase === "missing" ? "primary" : "tertiary"} onClick={onCheck}>Check again</Key>}
+        {switchTo && <Key size="sm" variant="tertiary" onClick={switchTo.onSelect}>{switchTo.label}</Key>}
       </div>
     </div>
   );

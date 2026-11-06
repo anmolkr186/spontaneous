@@ -108,5 +108,12 @@ Nothing open right now.
   - From the agent panel's ⋯ menu or ⌘K. It's scripted (`src/editor/demo-run.ts`), never calls Claude Code, and shows every block component, applying real edits.
 - **The agent is the user's Claude Code CLI over stream-json, acting only through our MCP tools** (2026-10-30)
   - `docs/ARCHITECTURE.md` §7.
+- **Codex is a second harness, picked in the composer** (2026-11-06)
+  - The composer's segmented key switches between Claude Code and the user's own Codex CLI; each keeps its own conversation, model and effort. Same prompt, same UI blocks, same rule: the agent edits only through plans the person runs.
+  - Codex runs as one `codex exec --json` process per message, resuming its thread by id after the first (`src-tauri/src/codex.rs`). Its events are translated into Claude Code's stream-json shapes in Rust, so the store reads both the same way. Chosen over `codex app-server`, which streams text deltas but is marked experimental; the cost is that a Codex reply appears whole rather than word by word.
+  - Kept as bare as Claude Code's `--tools ""`: `--ignore-user-config` (no user MCP servers or plugins), a read-only sandbox, web search off, and its tool features off. With the code-mode host off, the one code tool Codex keeps fails closed. Skills, apps, permissions, collaboration and environment instructions are dropped, which halves its prompt (about 92k to 44k characters); Codex's own base instructions stay, as Claude Code's do.
+  - Sign-in stays with the CLI (`codex login`, `codex login status`). The app never reads `~/.codex/auth.json`. API key variables are stripped before spawning; a Codex signed in with an API key shows the "Not using your plan" warning.
+  - Checked live: GPT-6.1-Sol answers a note with a correct `propose_plan` block. GPT-6-Luna at low effort described the plan without the block, so small models may need a stronger nudge in the prompt.
+  - No default model or effort for either harness: one is always picked (2026-11-06).
 - **The agent UI catalog is the single source for which component renders which moment of a run** (2026-11-06)
   - `src/ui/agent-ui/catalog.ts` generates `docs/AGENT_UI.md` (`npm run docs:agent-ui`) and feeds the docs' "In the stream" sections and the Agent harness page.
