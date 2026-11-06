@@ -3,9 +3,8 @@ import type { ReactNode } from "react";
 import { Composer, Message, Thread, When, useThreadState } from "./runtime";
 import type { ReasoningMessagePartComponent, TextMessagePartComponent, ToolCallMessagePartComponent } from "./runtime";
 import { ArrowUp, Check, ChevronDown, ChevronRight, Circle, Clock3, Minus, Square, X } from "lucide-react";
-import { IconKey, Kbd, Key, Mark, RollText } from "@/ui/atoms";
+import { IconKey, Kbd, Key, Mark } from "@/ui/atoms";
 import { useCtaRole } from "@/ui/cta";
-import type { CtaIntent } from "@/ui/cta";
 import { formatTime } from "@/editor/model";
 import { visibleText } from "@/editor/agent-stream";
 import { ThinkingLoader } from "@/ui/molecules/thinking-loader";
@@ -21,8 +20,6 @@ export type { AgentActions };
 /* ───────────────────────── Thread ───────────────────────── */
 
 export interface AgentThreadProps {
-  /** Rendered above the composer, e.g. suggestion chips. */
-  suggestions?: ReactNode;
   /** Runs waiting their turn, shown between the thread and the composer. */
   queue?: ReactNode;
   /** Shown when the thread has no messages. */
@@ -34,7 +31,7 @@ export interface AgentThreadProps {
   onUndo?: (toolCallId: string) => void;
   /** Replaces the built-in composer, e.g. with a Chat composer wired to the app. */
   composer?: ReactNode;
-  /** Sits between the thread and the suggestions, e.g. the Agent monitor or Agent steering. */
+  /** Sits between the thread and the composer, e.g. the Agent monitor or Agent steering. */
   above?: ReactNode;
   /** What parts can do in the app: seek, undo by entry, regenerate, open a note. */
   actions?: AgentActions;
@@ -50,7 +47,7 @@ const UndoContext = createContext<((toolCallId: string) => void) | undefined>(un
  * A reply reads top to bottom as: reasoning (collapsed), the steps it took on
  * one rail, then the result in plain text. A batch of notes adds a checklist.
  */
-export function AgentThread({ suggestions, queue, empty, composerMeta, tools, onUndo, composer, above, actions }: AgentThreadProps) {
+export function AgentThread({ queue, empty, composerMeta, tools, onUndo, composer, above, actions }: AgentThreadProps) {
   return (
     <AgentActionsContext.Provider value={{ undo: onUndo, ...actions }}>
     <UndoContext.Provider value={onUndo}>
@@ -63,7 +60,6 @@ export function AgentThread({ suggestions, queue, empty, composerMeta, tools, on
           <Thread.ViewportFooter className={styles.footer}>
             {queue}
             {above}
-            {suggestions}
             {composer ?? <AgentComposer meta={composerMeta} />}
           </Thread.ViewportFooter>
         </Thread.Viewport>
@@ -363,31 +359,6 @@ function SendKey() {
   const empty = useThreadState((s) => s.composer.isEmpty);
   const role = useCtaRole("run", !empty);
   return <Composer.Send className={styles.send} data-role={role} aria-label="Send"><ArrowUp /></Composer.Send>;
-}
-
-/* ───────────────────────── Suggestions ───────────────────────── */
-
-export interface Suggestion {
-  id: string;
-  label: string;
-  onSelect: () => void;
-  /** Give a suggestion an intent and it competes for the region's primary: "Apply 3 notes" is a run. Others stay quiet. */
-  intent?: CtaIntent;
-}
-
-/** Quiet one-tap prompts above the composer. One with an intent can rise to the light face when it's the most useful thing to do. */
-export function SuggestionChips({ items }: { items: Suggestion[] }) {
-  if (!items.length) return null;
-  return (
-    <div className={styles.suggestions}>
-      {items.map((s) => <SuggestionChip key={s.id} item={s} />)}
-    </div>
-  );
-}
-
-function SuggestionChip({ item }: { item: Suggestion }) {
-  const role = useCtaRole(item.intent ?? "navigate", !!item.intent, "secondary");
-  return <button type="button" className={styles.suggestion} data-role={item.intent ? role : undefined} onClick={item.onSelect}><RollText text={item.label} /></button>;
 }
 
 export { styles as agentStyles };

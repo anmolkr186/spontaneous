@@ -467,7 +467,6 @@ export const SURFACES: AgentSurface[] = [
     trigger: { source: "stream", event: "all stream-json events, converted to thread parts" },
     agentSays: "(container) Text deltas become text parts, thinking becomes reasoning, tool_use becomes tool parts rendered by this catalog.",
     props: "tools = { by_name: { ask_user: AskCard, propose_plan: AgentPlan, propose_text_edit: InlineDiff, … } }; anything unlisted falls back to ToolCall.",
-    keys: "Suggestion chips with an intent compete for the panel's primary: Apply 2 notes (run) rises to the light face when nothing else is waiting.",
   },
   {
     id: "chat-composer",

@@ -12,7 +12,6 @@ import { Switcher } from "@/ui/molecules";
 import { ApprovalCard } from "@/ui/organisms/approval-card";
 import { AgentPlan } from "@/ui/organisms/agent-plan";
 import type { PlanStep } from "@/ui/organisms/agent-plan";
-import { SuggestionChips } from "@/ui/organisms/agent";
 import { CtaKey, CtaRegion, CtaRoot, checkLabel, exportLabel, notesLabel } from "@/ui/cta";
 import type { CtaIntent } from "@/ui/cta";
 import { AgentSays, UserSays } from "../demo";
@@ -70,7 +69,6 @@ function Mock({ moment, notes }: { moment: Moment; notes: keyof typeof NOTE_SETS
               )}
               {moment === "done" && <><UserSays>Apply my notes.</UserSays><AgentSays><p className={styles.text}>Applied 3 notes: two zooms and a callout.</p></AgentSays></>}
               <span className={styles.grow} />
-              {moment === "notes" && <SuggestionChips items={[{ id: "apply", intent: "run", label: notesLabel(open), onSelect: () => {} }, { id: "draft", label: "Draft a launch cut", onSelect: () => {} }]} />}
               <div className={styles.composer}><span>Ask the agent…</span><Key size="sm" variant="secondary" disabled>Send</Key></div>
             </section>
           </CtaRegion>

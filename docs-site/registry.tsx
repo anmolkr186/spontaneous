@@ -10,7 +10,7 @@ import { AnnotationDock, RecorderDock } from "@/ui/organisms/dock";
 import type { AnnotationTool, RecordSource, RecorderPhase } from "@/ui/organisms/dock";
 import { AnnotationLayer, Camera, CanvasViewport, Cursor, DeviceFrame } from "@/ui/organisms/stage";
 import { ClipItem, NoteMarker, Timeline, Track, TrackItem, Transport, Waveform } from "@/ui/organisms/timeline";
-import { AgentThread, AskCardView, CliUpdateNotice, SuggestionChips } from "@/ui/organisms/agent";
+import { AgentThread, AskCardView, CliUpdateNotice } from "@/ui/organisms/agent";
 import type { CliUpdateNoticeProps } from "@/ui/organisms/agent";
 import { AgentRuntimeProvider, useAgentStoreRuntime } from "@/ui/organisms/agent/runtime";
 import type { AgentMessage } from "@/ui/organisms/agent/runtime";
@@ -620,11 +620,10 @@ const CORE: Omit<DocEntry, "category">[] = [
   {
     id: "agent-thread", name: "AgentThread", layer: "Organisms",
     description: "The agent conversation. Text, collapsed reasoning, and a card for every tool call. Edits get an Undo, and questions from the agent become an AskCard.",
-    demo: () => <div style={{ width: 360, height: 480, display: "flex", overflow: "hidden", borderRadius: 14, background: "var(--surface)", boxShadow: "var(--card-shadow)" }}><DemoRuntime messages={demoThread}><AgentThread suggestions={<SuggestionChips items={[{ id: "a", label: "Apply 2 open notes", onSelect: () => {} }]} />} /></DemoRuntime></div>,
-    usage: `<AgentRuntimeProvider runtime={runtime}>\n  <AgentThread suggestions={<SuggestionChips items={…} />} />\n</AgentRuntimeProvider>`,
+    demo: () => <div style={{ width: 360, height: 480, display: "flex", overflow: "hidden", borderRadius: 14, background: "var(--surface)", boxShadow: "var(--card-shadow)" }}><DemoRuntime messages={demoThread}><AgentThread /></DemoRuntime></div>,
+    usage: `<AgentRuntimeProvider runtime={runtime}>\n  <AgentThread />\n</AgentRuntimeProvider>`,
     source: agentSrc, sourcePath: "src/ui/organisms/agent/index.tsx",
     props: [
-      { name: "suggestions", type: "ReactNode", description: "Above the composer, driven by open notes." },
       { name: "tools", type: "Record<string, ToolCallMessagePartComponent>", description: "Per-tool renderers; others fall back to an edit card." },
     ],
     composedOf: ["Mark", "Key", "Kbd", "Dock material (composer)"],

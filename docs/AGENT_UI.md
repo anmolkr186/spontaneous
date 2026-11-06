@@ -542,7 +542,6 @@ The conversation itself: every surface above renders inside it as a message part
 - **Trigger:** stream: all stream-json events, converted to thread parts
 - **Agent says:** “(container) Text deltas become text parts, thinking becomes reasoning, tool_use becomes tool parts rendered by this catalog.”
 - **Props:** tools = { by_name: { ask_user: AskCard, propose_plan: AgentPlan, propose_text_edit: InlineDiff, … } }; anything unlisted falls back to ToolCall.
-- **Keys:** Suggestion chips with an intent compete for the panel's primary: Apply 2 notes (run) rises to the light face when nothing else is waiting.
 
 ### Chat composer
 

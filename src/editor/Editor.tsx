@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, Clapperboard, Film, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pause, Play, Redo2, RotateCcw, Scissors, Share, Undo2, ZoomIn, ZoomOut } from "lucide-react";
@@ -12,7 +12,7 @@ import { AnnotationLayer, Callout, Camera, CanvasViewport, Cursor, DeviceFrame, 
 import type { DeviceKind } from "@/ui/organisms/stage";
 import { AnnotationDock, Dock, DockDivider, DockTool } from "@/ui/organisms/dock";
 import { ClipItem, NoteMarker, Timeline, Track, TrackItem, Transport, Waveform, fitPps } from "@/ui/organisms/timeline";
-import { AgentConnect, AgentEmpty, AgentThread, CliUpdateNotice, SuggestionChips } from "@/ui/organisms/agent";
+import { AgentConnect, AgentEmpty, AgentThread, CliUpdateNotice } from "@/ui/organisms/agent";
 import { Toaster } from "@/ui/organisms/toaster";
 import { AgentRuntimeProvider, useAgentStoreRuntime } from "@/ui/organisms/agent/runtime";
 import type { AgentMessage, AppendMessage } from "@/ui/organisms/agent/runtime";
@@ -732,23 +732,10 @@ function AgentPane() {
 }
 
 function AgentConversation() {
-  const notes = useEditor((s) => s.project.notes);
-  const running = useAgent((s) => s.running);
-  const queue = useAgent((s) => s.queue);
-  const { applyNotes, send, undo } = useAgent.getState();
+  const { undo } = useAgent.getState();
   const actions = useAgentActions();
-  const open = notes.filter((n) => n.status === "open");
-  const items = useMemo(() => {
-    if (running || queue.length) return [];
-    const list = [];
-    // In the app the agent can only plan for now, so the key says so.
-    if (open.length) list.push({ id: "apply", intent: "run" as const, label: isTauri ? (open.length === 1 ? "Plan open note" : `Plan ${open.length} open notes`) : notesLabel(open), onSelect: () => applyNotes() });
-    list.push({ id: "launch", label: "Draft a launch cut", onSelect: () => send("Draft a launch cut from these clips") });
-    return list;
-  }, [open, running, queue.length, applyNotes, send]);
   return (
     <AgentThread
-      suggestions={<SuggestionChips items={items} />}
       above={<AgentAbove />}
       composer={<AgentComposerBar />}
       actions={actions}
