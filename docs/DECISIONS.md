@@ -75,6 +75,12 @@ Nothing open right now.
   - It's the only primary that takes a hue. Red already means recording and destructive, so it stays within the signals.
   - Chosen over a light face with a red label, and over a key with a red label.
 
+### Development
+- **On localhost the browser build opens a sample recording, as if it had just been captured** (2026-11-06)
+  - The desktop app always starts by recording; the browser build skips that and loads `dev/sample/Sample recording` through the same `capture.lastFinished` → `projectFromRecording` path, so playback, zooms and agent edits act on a real clip.
+  - The dev server serves it (`scripts/dev-recordings.ts`, serve only, with byte ranges for seeking). It's not in the built app. `?recording=latest`, a capture's name, or `none` picks another.
+  - The sample is a made-up app drawn by `scripts/make-sample-recording.mjs`, so it holds nothing personal and can be regenerated.
+
 ### Agent
 - **The agent is the user's Claude Code CLI over stream-json, acting only through our MCP tools** (2026-10-30)
   - `docs/ARCHITECTURE.md` §7.
