@@ -25,16 +25,29 @@ export interface Overlay { id: string; kind: OverlayKind; start: Seconds; end: S
 
 export type NoteIntent = "zoom" | "blur" | "callout" | "speed" | "cut" | "style";
 export type NoteStatus = "open" | "queued" | "applying" | "applied" | "dismissed";
+export type Rect = { x: number; y: number; w: number; h: number };
 export interface Note {
   id: string;
   at: Seconds;
   text: string;
   intents: NoteIntent[];
   status: NoteStatus;
-  /** Normalized region on the frame the note points at. */
-  region?: { x: number; y: number; w: number; h: number };
-  /** Ink stroke as an SVG path in a 0–100 box, normalized to the frame. */
+  /**
+   * What `region` and `ink` are measured against (src/editor/space.ts).
+   * "canvas": the whole output frame, backdrop included. Every note made now.
+   * Absent: the recording, as notes were before 2026-11-06.
+   */
+  space?: "canvas";
+  /** Normalized region the note points at, in `space`. */
+  region?: Rect;
+  /** Ink stroke as an SVG path in a 0–100 box, in `space`. */
   ink?: string;
+  /**
+   * The part of `region` that lies on the recording, 0–1 of the recording,
+   * measured on the frame it was drawn on. Absent when the mark is only on the
+   * backdrop. Zooms, blurs and callouts aim here.
+   */
+  screen?: Rect;
   voice?: { seconds: number };
   createdAt: string;
   resolvedBy?: string[];
@@ -182,6 +195,32 @@ export function formatTime(t: Seconds, withFrames = false, fps = 60): string {
   if (!withFrames) return base;
   const f = Math.floor((clamped % 1) * fps);
   return `${base}.${String(f).padStart(2, "0")}`;
+}
+
+/** Where a note points on the recording, if it does: what zoom targets and blurs aim at. */
+export function noteOnRecording(n: Note): Rect | undefined {
+  return n.space === "canvas" ? n.screen : n.region;
+}
+
+/** Pin numbers as the Notes list shows them: notes in time order, dismissed ones left out. */
+export function pinNumbers(notes: Note[]): Record<string, number> {
+  const ordered = notes.filter((n) => n.status !== "dismissed").sort((a, b) => a.at - b.at);
+  return Object.fromEntries(ordered.map((n, i) => [n.id, i + 1]));
+}
+
+/** How the agent reads note areas; send it once with any message that lists them. */
+export const AREA_LEGEND = "Areas are 0–1 (x, y from the top left). \"frame\" is the whole output video, backdrop included; \"recording\" is the screen recording inside it, the space zoom targets use.";
+
+/**
+ * A note's area in words for the agent, or "" when it has none:
+ * "frame x 0.62 y 0.08 w 0.2 h 0.15, on the recording at x 0.7 y 0.02 w 0.25 h 0.2".
+ */
+export function noteArea(n: Note): string {
+  if (!n.region) return "";
+  const r = (v: number) => Math.round(v * 100) / 100;
+  const box = (b: Rect) => `x ${r(b.x)} y ${r(b.y)} w ${r(b.w)} h ${r(b.h)}`;
+  if (n.space !== "canvas") return `recording ${box(n.region)}`;
+  return `frame ${box(n.region)}, ${n.screen ? `on the recording at ${box(n.screen)}` : "on the backdrop, off the recording"}`;
 }
 
 export const uid = (prefix: string) => `${prefix}${Math.random().toString(36).slice(2, 8)}`;

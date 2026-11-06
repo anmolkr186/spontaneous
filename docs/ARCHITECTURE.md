@@ -172,8 +172,10 @@ Every mutation is a `Command { id, author: "user"|"agent", base_revision, op, in
 ```ts
 Annotation {
   id, at: { start, end? },           // time anchor
-  region?: Rect | Path,              // where on the frame
-  ink?: Stroke[],                    // pen strokes, normalized coords
+  space?: "canvas",                  // absent on notes from before 2026-11-06: region and ink are on the recording
+  region?: Rect | Path,              // where on the frame: 0–1 of the output canvas, backdrop included
+  ink?: Stroke[],                    // pen strokes, same space
+  screen?: Rect,                     // the part of region on the recording, 0–1 of the recording; absent if only on the backdrop
   voice?: { file, transcript },      // whisper.cpp / Apple Speech, local
   text?: string,
   intent?: "zoom"|"blur"|"callout"|"speed"|"cut"|"style"|"other",
@@ -181,6 +183,8 @@ Annotation {
   resolvedBy?: CommandId[]           // which edits answered this note
 }
 ```
+
+Notes are drawn on the whole canvas, so they can point at the backdrop around the recording (room for a title, say). Zooms, the cursor and callouts stay in recording space. When a note is made, the stage measures where the recording sits on the canvas (corner markers read back through the shot's 2D or 3D transform) and stores the overlap as `screen`; that is what a zoom aims at (`src/editor/space.ts`).
 
 Notes look like Flask's time-coded feedback: a pin on the timeline and a card in the thread. When a note is resolved, its card links to the exact edits, and those edits can be reverted together.
 

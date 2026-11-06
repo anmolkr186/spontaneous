@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AgentMessage as ThreadMessageLike } from "@/ui/organisms/agent/runtime";
-import { formatTime, uid } from "./model";
+import { AREA_LEGEND, formatTime, noteArea, noteOnRecording, uid } from "./model";
 import type { Note } from "./model";
 import { useEditor } from "./store";
 import { isTauri } from "@/platform/tauri";
@@ -161,18 +161,19 @@ function loadAutonomy(): Autonomy {
 
 /**
  * What the agent knows about the project, sent ahead of every message: it has
- * no tools to read it. Kept short; times in seconds, areas as 0–1 of the frame.
+ * no tools to read it. Kept short; times in seconds, areas as 0–1 of the frame or the recording (AREA_LEGEND).
  */
 function projectOutline(): string {
   const p = useEditor.getState().project;
   const r = (n: number) => Math.round(n * 100) / 100;
   const notes = p.notes.filter((n) => n.status !== "dismissed").sort((a, b) => a.at - b.at)
-    .map((n, i) => `  note ${n.id} pin ${i + 1} at ${r(n.at)}s${n.region ? ` area x ${r(n.region.x)} y ${r(n.region.y)} w ${r(n.region.w)} h ${r(n.region.h)}` : ""} [${n.status}]: ${n.text || "(marked, no text)"}`);
+    .map((n, i) => `  note ${n.id} pin ${i + 1} at ${r(n.at)}s${n.region ? ` area ${noteArea(n)}` : ""} [${n.status}]: ${n.text || "(marked, no text)"}`);
   const zooms = p.zooms.map((z) => `  zoom ${z.id} ${r(z.start)}–${r(z.end)}s ${z.scale}× at x ${r(z.target.x)} y ${r(z.target.y)} (${z.author})`);
   const overlays = p.overlays.map((o) => `  ${o.kind} ${o.id} ${r(o.start)}–${r(o.end)}s "${o.label}" (${o.author})`);
   return [
     `<project name="${p.name}" length="${r(p.duration)}s" shot="${p.template}" camera-speed="${p.motion.speed}" camera-amount="${p.motion.amount}">`,
     notes.length ? `notes:\n${notes.join("\n")}` : "notes: none",
+    AREA_LEGEND,
     zooms.length ? `zooms:\n${zooms.join("\n")}` : "zooms: none",
     overlays.length ? `overlays:\n${overlays.join("\n")}` : "overlays: none",
     `shots you can use: ${SHOTS.map((s) => `${s.id} (${s.name})`).join(", ")}`,
@@ -187,10 +188,10 @@ const answerLine = (said: string, tool: string, id: string, payload: unknown) =>
 /** The prompt for a batch of notes: where each one sits and what it says. */
 function notesPrompt(notes: Note[]): string {
   const lines = notes.map((n, i) => {
-    const where = n.region ? ` on the area at x ${n.region.x.toFixed(2)}, y ${n.region.y.toFixed(2)}, w ${n.region.w.toFixed(2)}, h ${n.region.h.toFixed(2)} of the frame` : "";
-    return `${i + 1}. At ${formatTime(n.at)}${where}: ${n.text || "(marked on the frame, no text)"}`;
+    const where = noteArea(n);
+    return `${i + 1}. At ${formatTime(n.at)}${where ? ` on ${where}` : ""}: ${n.text || "(marked on the frame, no text)"}`;
   });
-  return `Here are my notes on the recording:\n${lines.join("\n")}`;
+  return `Here are my notes on the recording:\n${lines.join("\n")}${notes.some((n) => n.region) ? `\n${AREA_LEGEND}` : ""}`;
 }
 
 /** Pin numbers match the Notes list: notes in time order, dismissed ones left out. */
@@ -514,10 +515,13 @@ export const useAgent = create<AgentState>((set, get) => {
     const at = note.at;
     const made: string[] = [];
     const did: string[] = [];
-    await streamText("reasoning", `Note at ${formatTime(at)}: "${note.text}" ${note.region ? "It points at a marked area of the frame, so the zoom should center there." : "There's no marked area, so I'll work from timing."} I'll check the input events around it first.`, token);
+    // Zooms aim at the recording, so a mark on the backdrop alone gives no target.
+    const target = noteOnRecording(note);
+    const where = target ? "It points at a marked area of the recording, so the zoom should center there." : note.region ? "It marks the backdrop, off the recording, so there's nothing there to zoom into." : "There's no marked area, so I'll work from timing.";
+    await streamText("reasoning", `Note at ${formatTime(at)}: "${note.text}" ${where} I'll check the input events around it first.`, token);
     await tool("get_input_events", { from: Math.max(0, at - 3), to: at + 5 }, () => ({ clicks: [at + 0.6], focus: "Create project" }), token);
-    if (note.intents.includes("zoom") || note.region) {
-      const r = note.region ?? { x: 0.4, y: 0.4, w: 0.2, h: 0.2 };
+    if (note.intents.includes("zoom") || target) {
+      const r = target ?? { x: 0.4, y: 0.4, w: 0.2, h: 0.2 };
       const args = { start: Math.max(0, at - 1.2), end: at + 4.2, scale: 1.8, target: { x: +(r.x + r.w / 2).toFixed(2), y: +(r.y + r.h / 2).toFixed(2) } };
       // An agent zoom supersedes any auto zoom it overlaps, the same way a user edit would.
       const overlapped = useEditor.getState().project.zooms.filter((z) => z.author === "auto" && z.start < args.end && z.end > args.start);

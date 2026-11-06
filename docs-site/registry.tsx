@@ -184,9 +184,9 @@ function StageDemo() {
           <DeviceFrame kind="browser">
             <ScreenArt tone="cobalt" />
             <Cursor x={0.36} y={0.84} size={1.3} />
-            <AnnotationLayer notes={[]} tool="pen" draft={draft} onDraft={setDraft} />
           </DeviceFrame>
         </Camera>
+        <AnnotationLayer notes={[]} tool="pen" draft={draft} onDraft={setDraft} />
       </CanvasViewport>
     </div>
   );

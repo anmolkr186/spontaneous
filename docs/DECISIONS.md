@@ -79,6 +79,21 @@ Nothing open right now.
   - It's the only primary that takes a hue. Red already means recording and destructive, so it stays within the signals.
   - Chosen over a light face with a red label, and over a key with a red label.
 
+### Development
+- **On localhost the browser build opens a sample recording, as if it had just been captured** (2026-11-06)
+  - The desktop app always starts by recording; the browser build skips that and loads `dev/sample/Sample recording` through the same `capture.lastFinished` → `projectFromRecording` path, so playback, zooms and agent edits act on a real clip.
+  - The dev server serves it (`scripts/dev-recordings.ts`, serve only, with byte ranges for seeking). It's not in the built app. `?recording=latest`, a capture's name, or `none` picks another.
+  - The sample is a made-up app drawn by `scripts/make-sample-recording.mjs`, so it holds nothing personal and can be regenerated.
+
+### Annotations
+- **Notes are drawn on the whole canvas, not only on the recording** (2026-11-06)
+  - Pins, regions and ink live in canvas space: 0–1 of the output frame, backdrop included, in every shot. So you can mark the space around a window or a laptop, for a title or a callout.
+  - Zoom targets, the cursor, clicks and callouts stay in recording space. Each new note also stores `screen`, the part of its region on the recording, measured on the frame it was drawn on through the shot's transform (`src/editor/space.ts`). Zooms aim there. A mark only on the backdrop has no `screen` and no zoom intent.
+  - In Tile Stack and Infinite Wall every screen is the recording; a mark maps through the screen under it, front first.
+  - Notes saved before this have no `space` field and stay in recording space: they still render on the recording, where they were made. No migration, because moving them to canvas space would depend on the shot and the moment.
+  - The agent reads both spaces by name: "frame x … y … w … h …, on the recording at …" or "on the backdrop, off the recording" (`noteArea` and `AREA_LEGEND` in `src/editor/model.ts`).
+  - Chosen over migrating old notes, and over keeping annotations inside the recording with a separate backdrop layer.
+
 ### Agent
 - **The agent components are wired into the editor's agent panel** (2026-11-06)
   - Thread parts, the Chat composer, Model picker, Agent steering, Agent monitor, Toaster, the ⌘K Command menu, a Changes tab (Agent ledger and Agent checkpoints) and the Context window, following the Choosing rules in `docs/AGENT_UI.md`.
