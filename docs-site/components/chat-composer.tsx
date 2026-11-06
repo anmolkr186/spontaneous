@@ -91,19 +91,22 @@ export const entry: DocEntry = {
   transcript={{ final: speech.final, interim: speech.interim }}
   running={agent.isRunning}
   onStop={agent.cancel}
-  onSend={(text, { attachments, model, thinking, effort }) => agent.run({ text, attachments, model, thinking, effort })}
+  onSend={(text, { attachments, model, effort }) => agent.run({ text, attachments, model, effort })}
 />`,
   source: src,
   sourcePath: "src/ui/organisms/chat-composer/index.tsx",
   props: [
     { name: "value / defaultValue / onChange", type: "string / string / (text) => void", description: "The text, controlled or not." },
-    { name: "onSend", type: "(text, { attachments, model, thinking, effort }) => void", description: "Called on Send or Enter. The field and the attachments clear after." },
+    { name: "onSend", type: "(text, { attachments, model, effort }) => void", description: "Called on Send or Enter. The field and the attachments clear after." },
     { name: "running", type: "boolean = false", description: "The agent is working: Send turns into Stop." },
     { name: "onStop", type: "() => void", description: "Called when Stop is pressed." },
     { name: "attachments / defaultAttachments / onAttachmentsChange", type: "ComposerAttachment[] / … / (list) => void", description: "{ id, kind, at?, label?, index?, thumb? } where kind is frame, region, note or file. Controlled or not." },
     { name: "onAttach", type: "(kind) => ComposerAttachment | null | void", description: "Called when an item in the \"+\" menu is picked; return an attachment to add it. Without it, frames and regions are added at the playhead." },
     { name: "playhead", type: "number = 0", description: "The playhead in seconds. The menu offers the frame there." },
-    { name: "models / model / defaultModel / onModelChange", type: "PickerModel[] / string / string / (id) => void", description: "Passed to the ModelPicker in the row. Thinking and effort are kept inside and handed to onSend." },
+    { name: "models / model / defaultModel / onModelChange", type: "PickerModel[] / string / string / (id) => void", description: "Passed to the ModelPicker in the row. Effort is kept inside unless controlled, and handed to onSend." },
+    { name: "harnesses / harness / onHarnessChange", type: "Harness[] / string / (id) => void", description: "Turns the picker into a segmented key whose left segment switches harness, e.g. Claude Code and Codex." },
+    { name: "effort / onEffortChange / efforts", type: "Effort / (effort) => void / EffortOption[]", description: "The effort ladder in the model menu, lowest first. Empty hides it." },
+    { name: "sendBlocked", type: "string", description: "Why Send can't run, e.g. the harness isn't wired. Send stays off and its tooltip says this; the text stays." },
     { name: "listening / onListeningChange", type: "boolean / (on) => void", description: "Dictation on, controlled or not. Stopping keeps the words; Esc drops them." },
     { name: "transcript", type: "{ final: string; interim: string }", description: "Words from your speech recognizer while listening. Without it, a simulated take of dictation plays word by word." },
     { name: "dictation", type: "string", description: "The sentence a simulated take plays." },

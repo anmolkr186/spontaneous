@@ -1,7 +1,7 @@
 /**
  * The agent panel's pieces around the thread, wired to the app:
  *
- *   AgentComposerBar  the Chat composer: model and effort from your Claude Code, frames and notes as context
+ *   AgentComposerBar  the Chat composer: harness, model and effort at the bottom, frames and notes as context
  *   AgentAbove        while a plan runs, Agent steering; on a long run, the Agent monitor; otherwise the queue
  *   AgentMenu         the panel's "⋯": play a demo run, agent permissions, context
  *   useAgentActions   what thread parts can do here: seek, undo a change, open a note, ask again
@@ -12,6 +12,7 @@ import { Ellipsis, Play, Shield, SquareStack } from "lucide-react";
 import { IconKey, Key } from "@/ui/atoms";
 import { ChatComposer } from "@/ui/organisms/chat-composer";
 import type { ComposerAttachment, ComposerSendDetails } from "@/ui/organisms/chat-composer";
+import { HARNESSES } from "@/ui/molecules/model-picker";
 import type { EffortOption, PickerModel } from "@/ui/molecules/model-picker";
 import { AgentQueue } from "@/ui/organisms/agent";
 import type { AgentActions } from "@/ui/organisms/agent";
@@ -23,7 +24,8 @@ import { AutonomyDial } from "@/ui/organisms/autonomy-dial";
 import { ContextWindow } from "@/ui/organisms/context-window";
 import type { ContextPart } from "@/ui/organisms/context-window";
 import { STEP_TOOLS } from "./apply";
-import { AGENT_EFFORTS, AGENT_MODELS, effortLabel } from "./agent-stream";
+import { AGENT_EFFORTS, AGENT_MODELS, CODEX_MODELS, effortLabel, isDefaultEntry, preferredEffort, recommendedModel } from "./agent-stream";
+import type { HarnessId } from "./agent-stream";
 import { useAgent } from "./agent";
 import { useChanges } from "./changes";
 import { formatTime } from "./model";
@@ -60,21 +62,34 @@ function withAttachments(text: string, attachments: ComposerAttachment[]): strin
   return [text, ...lines].filter(Boolean).join("\n");
 }
 
+/** Codex is offered ahead of its host: the menu says so. */
+const PANEL_HARNESSES = HARNESSES.map((h) => (h.id === "codex" ? { ...h, note: "Can't run here yet" } : h));
+
 export function AgentComposerBar() {
   const running = useAgent((s) => s.running);
   const catalog = useAgent((s) => s.catalog);
   const modelChoice = useAgent((s) => s.modelChoice);
   const effortChoice = useAgent((s) => s.effortChoice);
+  const harness = useAgent((s) => s.harness);
+  const codexModel = useAgent((s) => s.codexModel);
+  const codexEffort = useAgent((s) => s.codexEffort);
   const time = useEditor((s) => s.time);
-  const { send, cancel, setModelChoice, setEffortChoice } = useAgent.getState();
+  const { send, cancel, setModelChoice, setEffortChoice, setHarness, setCodexModel, setCodexEffort } = useAgent.getState();
+  const codex = harness === "codex";
 
-  const models: PickerModel[] = catalog
-    ? catalog.map((m) => ({ id: m.value, name: m.displayName, description: m.description, ...family(m.value, m.displayName) }))
+  // Claude: the CLI's own list without its "default" entry; until it arrives, the fallback aliases.
+  const claudeModels: PickerModel[] = catalog
+    ? catalog.filter((m) => !isDefaultEntry(m.value)).map((m) => ({ id: m.value, name: m.displayName, description: m.description, ...family(m.value, m.displayName) }))
     : AGENT_MODELS.map((m) => ({ id: m.value, name: m.label, ...family(m.value, m.label) }));
-  const current = catalog?.find((m) => m.value === (modelChoice ?? "default"));
-  const levels = current ? current.supportedEffortLevels ?? [] : AGENT_EFFORTS.filter((e) => e.value !== "default").map((e) => e.value);
+  const claudeModel = modelChoice ?? recommendedModel(catalog);
+  const current = catalog?.find((m) => m.value === claudeModel);
+  const claudeLevels = current ? (current.supportsEffort === false ? [] : current.supportedEffortLevels ?? []) : AGENT_EFFORTS.map((e) => e.value);
+
+  const codexPicked = CODEX_MODELS.find((m) => m.value === codexModel) ?? CODEX_MODELS[0]!;
+  const models: PickerModel[] = codex ? CODEX_MODELS.map((m) => ({ id: m.value, name: m.label, description: m.description })) : claudeModels;
+  const levels = codex ? codexPicked.efforts : claudeLevels;
   const efforts: EffortOption[] = levels.map((l) => ({ value: l, label: effortLabel(l) }));
-  const canThink = efforts.length > 0 && current?.supportsEffort !== false;
+  const effort = codex ? codexEffort : effortChoice ?? preferredEffort(levels) ?? "";
 
   /** A note attached from the panel is the selected one, or the one nearest the playhead. */
   const onAttach = (kind: ComposerAttachment["kind"]): ComposerAttachment | null => {
@@ -95,14 +110,16 @@ export function AgentComposerBar() {
       onSend={(text: string, details: ComposerSendDetails) => send(withAttachments(text, details.attachments))}
       onAttach={onAttach}
       playhead={time}
+      harnesses={PANEL_HARNESSES}
+      harness={harness}
+      onHarnessChange={(id) => setHarness(id as HarnessId)}
+      sendBlocked={codex ? "Codex can't run here yet" : undefined}
       models={models}
-      model={modelChoice ?? "default"}
-      onModelChange={(id) => setModelChoice(id === "default" ? null : id)}
-      thinking={canThink ? effortChoice !== null : false}
-      onThinkingChange={(on) => setEffortChoice(on ? (levels.includes("medium") ? "medium" : levels[0] ?? null) : null)}
-      effort={effortChoice ?? "medium"}
-      onEffortChange={(e) => setEffortChoice(e)}
-      efforts={canThink ? efforts : []}
+      model={codex ? codexPicked.value : claudeModel}
+      onModelChange={(id) => (codex ? setCodexModel(id) : setModelChoice(id))}
+      effort={effort}
+      onEffortChange={(e) => (codex ? setCodexEffort(e) : setEffortChoice(e))}
+      efforts={efforts}
       voice={false} systemInput={false}
       meta={<ContextKey />}
       placeholder="Ask the agent, or describe an edit…"

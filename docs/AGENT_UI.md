@@ -166,7 +166,7 @@ Any UI tool call may carry `"cta": { "primary": { "label", "intent" }, "secondar
 | The agent has a favorite shot for part of the video, with a reason and a way out. | Shot suggestion (`ShotSuggestion`) | `@/ui/molecules/shot-suggestion` | tool `suggest_shot` (proposed) |
 | The conversation itself: every surface above renders inside it as a message part. | Agent thread (`AgentThread`) | `@/ui/organisms/agent` | stream: all stream-json events, converted to thread parts |
 | Where the person tells the agent what to change, with frames, regions and notes attached. | Chat composer (`ChatComposer`) | `@/ui/organisms/chat-composer` | app: always present under the thread |
-| Choosing which model edits and whether it thinks first. | Model picker (`ModelPicker`) | `@/ui/molecules/model-picker` | stream: system init (model) · app setting |
+| Choosing which harness runs the agent (Claude Code or Codex), which model it uses and how hard it thinks. | Model picker (`ModelPicker`) | `@/ui/molecules/model-picker` | stream: system init (model) · app setting |
 | What fills the agent's context: prompt, tools, project outline, transcript, notes, frames, conversation. | Context window (`ContextWindow`) | `@/ui/organisms/context-window` | app: usage after each turn (result.usage) and the harness's own accounting per part |
 | ⌘K: run any edit, or hand what was typed to the agent. | Command menu (`CommandMenu`) | `@/ui/organisms/command-menu` | app: ⌘K |
 | Bringing recordings, b-roll and audio into the project. | Dropzone (`Dropzone`) | `@/ui/organisms/dropzone` | app: import |
@@ -559,10 +559,10 @@ Where the person tells the agent what to change, with frames, regions and notes 
 
 `import { ModelPicker } from "@/ui/molecules/model-picker"` · docs: `/docs.html#model-picker`
 
-Choosing which model edits and whether it thinks first.
+Choosing which harness runs the agent (Claude Code or Codex), which model it uses and how hard it thinks.
 
 - **Trigger:** stream: system init (model) · app setting
-- **Agent says:** “(not triggered by the agent) The chosen model and effort are passed as --model and the thinking budget on the next run.”
+- **Agent says:** “(not triggered by the agent) The chosen model and effort are passed as --model and --effort on the next run. There is no default entry: a model and an effort are always picked. Only Claude Code runs today; with Codex picked, Send stays off and says so.”
 - **Props:** value from init.model; onChange restarts the agent with the new model on the next turn.
 
 ```js

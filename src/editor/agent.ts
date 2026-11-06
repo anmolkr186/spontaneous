@@ -8,7 +8,8 @@ import { SHOTS, shotById } from "./shots";
 import type { Shot } from "./shots";
 import { agent } from "@/platform/agent";
 import type { AgentEvent, AgentModel } from "@/platform/agent";
-import { AGENT_MODELS, finalizeBlocks, modelName, reduceParts } from "./agent-stream";
+import { AGENT_MODELS, CODEX_MODELS, finalizeBlocks, isDefaultEntry, modelName, preferredEffort, recommendedModel, reduceParts } from "./agent-stream";
+import type { HarnessId } from "./agent-stream";
 import { applyStep, runUndo, stepName, stepRange, stepRisk, STEP_TOOLS } from "./apply";
 import type { ProposedStep, UndoRecord } from "./apply";
 import { useChanges } from "./changes";
@@ -66,12 +67,24 @@ interface AgentState {
   connection: AgentConnection;
   /** The model the CLI reported, as a display name. */
   model: string | null;
-  /** What the user picked, as a CLI alias or level. Null leaves it to the CLI's default. */
+  /**
+   * The Claude model and effort, as CLI values. Never the CLI's "default": null
+   * only until the CLI's list arrives (the model) or when the model has no
+   * effort levels (the effort).
+   */
   modelChoice: string | null;
   effortChoice: string | null;
   /** Takes effect from the next message, on the same conversation. */
-  setModelChoice: (value: string | null) => void;
+  setModelChoice: (value: string) => void;
   setEffortChoice: (value: string | null) => void;
+  /** Which harness the composer is set to. Only Claude Code runs; Codex is picked ahead of its host. */
+  harness: HarnessId;
+  setHarness: (harness: HarnessId) => void;
+  /** Codex's model and effort, kept apart from Claude's so switching back and forth keeps both. */
+  codexModel: string;
+  codexEffort: string;
+  setCodexModel: (value: string) => void;
+  setCodexEffort: (value: string) => void;
   /** Set when a session runs on something other than the plan login, which would bill elsewhere. */
   billedElsewhere: boolean;
   checkConnection: () => Promise<void>;
@@ -138,13 +151,22 @@ const isLive = (toolCallId: string) => isTauri && !toolCallId.startsWith("demo-"
 
 const CHOICES_KEY = "spontaneous.agent";
 
-function loadChoices(): { modelChoice: string | null; effortChoice: string | null } {
-  try {
-    const saved = JSON.parse(localStorage.getItem(CHOICES_KEY) ?? "{}");
-    return { modelChoice: saved.modelChoice ?? null, effortChoice: saved.effortChoice ?? null };
-  } catch {
-    return { modelChoice: null, effortChoice: null };
-  }
+type Choices = Pick<AgentState, "modelChoice" | "effortChoice" | "harness" | "codexModel" | "codexEffort">;
+
+function loadChoices(): Choices {
+  let saved: Partial<Record<keyof Choices, unknown>> = {};
+  try { saved = JSON.parse(localStorage.getItem(CHOICES_KEY) ?? "{}"); } catch { /* storage unavailable */ }
+  const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+  // A choice saved as the CLI's "default" from before the app dropped it gets resolved like no choice.
+  const model = str(saved.modelChoice);
+  const codex = CODEX_MODELS.find((m) => m.value === saved.codexModel) ?? CODEX_MODELS[0]!;
+  return {
+    modelChoice: model && !isDefaultEntry(model) ? model : isTauri ? null : recommendedModel(null),
+    effortChoice: str(saved.effortChoice) ?? "medium",
+    harness: saved.harness === "codex" ? "codex" : "claude-code",
+    codexModel: codex.value,
+    codexEffort: codex.efforts.includes(str(saved.codexEffort) ?? "") ? str(saved.codexEffort)! : preferredEffort(codex.efforts)!,
+  };
 }
 
 function saveChoices(choices: Record<string, unknown>) {
@@ -637,6 +659,13 @@ export const useAgent = create<AgentState>((set, get) => {
   };
 
   /** Runs need a signed-in CLI. If there isn't one, show the sign-in card instead of queuing. */
+  /** Only Claude Code runs today. With Codex picked, say so instead of running Claude behind its back. */
+  const runnable = () => {
+    if (get().harness === "claude-code") return true;
+    toast("Codex can't run here yet", { description: "Switch to Claude Code in the composer to send." });
+    return false;
+  };
+
   const connected = () => {
     if (get().connection.phase === "ready") return true;
     useEditor.getState().setSide("agent");
@@ -652,11 +681,13 @@ export const useAgent = create<AgentState>((set, get) => {
     setModelChoice: (modelChoice) => {
       sessionStale = true;
       const { catalog } = get();
-      const picked = catalog?.find((m) => m.value === (modelChoice ?? "default"));
+      const picked = catalog?.find((m) => m.value === modelChoice);
       // Until the CLI reports the model it ran, show the one that was picked.
-      const model = modelChoice ? picked?.displayName ?? AGENT_MODELS.find((m) => m.value === modelChoice)?.label ?? null : null;
-      // An effort the new model doesn't support goes back to its default.
-      const effortChoice = picked && !picked.supportedEffortLevels?.includes(get().effortChoice ?? "") ? null : get().effortChoice;
+      const model = picked?.displayName ?? AGENT_MODELS.find((m) => m.value === modelChoice)?.label ?? null;
+      // An effort the new model doesn't offer moves to one it does; a model with none has no effort.
+      const levels = picked ? (picked.supportsEffort === false ? [] : picked.supportedEffortLevels ?? []) : null;
+      const current = get().effortChoice;
+      const effortChoice = levels && !levels.includes(current ?? "") ? preferredEffort(levels) : current;
       set({ modelChoice, model, effortChoice });
       saveChoices({ modelChoice, effortChoice });
     },
@@ -666,6 +697,15 @@ export const useAgent = create<AgentState>((set, get) => {
       set({ effortChoice });
       saveChoices({ modelChoice: get().modelChoice, effortChoice });
     },
+
+    setHarness: (harness) => { set({ harness }); saveChoices({ harness }); },
+    setCodexModel: (codexModel) => {
+      const levels = CODEX_MODELS.find((m) => m.value === codexModel)?.efforts ?? [];
+      const codexEffort = levels.includes(get().codexEffort) ? get().codexEffort : preferredEffort(levels) ?? get().codexEffort;
+      set({ codexModel, codexEffort });
+      saveChoices({ codexModel, codexEffort });
+    },
+    setCodexEffort: (codexEffort) => { set({ codexEffort }); saveChoices({ codexEffort }); },
 
     checkConnection: async () => {
       if (!isTauri) return;
@@ -701,11 +741,11 @@ export const useAgent = create<AgentState>((set, get) => {
       const catalog = await agent.models().catch(() => undefined);
       if (!catalog?.length) return;
       set({ catalog });
-      // A saved choice the CLI no longer offers falls back to its default.
-      const { modelChoice, effortChoice } = get();
-      if (modelChoice && !catalog.some((m) => m.value === modelChoice)) get().setModelChoice(null);
-      const levels = catalog.find((m) => m.value === (get().modelChoice ?? "default"))?.supportedEffortLevels ?? [];
-      if (effortChoice && !levels.includes(effortChoice)) get().setEffortChoice(null);
+      // No choice yet, or one the CLI no longer offers, becomes the model its default recommends.
+      // setModelChoice also moves the effort to one that model offers.
+      const { modelChoice } = get();
+      const offered = modelChoice && !isDefaultEntry(modelChoice) && catalog.some((m) => m.value === modelChoice);
+      get().setModelChoice(offered ? modelChoice : recommendedModel(catalog));
     },
     cliVersion: null,
     restartSession: () => { sessionStale = true; },
@@ -749,10 +789,10 @@ export const useAgent = create<AgentState>((set, get) => {
       });
     },
 
-    send: (text) => { if (connected()) enqueue({ id: uid("q"), label: text, text }); },
+    send: (text) => { if (connected() && runnable()) enqueue({ id: uid("q"), label: text, text }); },
 
     applyNotes: (noteIds) => {
-      if (!connected()) return;
+      if (!connected() || !runnable()) return;
       const editor = useEditor.getState();
       const notes = editor.project.notes.filter((n) => n.status === "open" && (!noteIds || noteIds.includes(n.id)));
       if (!notes.length) return;

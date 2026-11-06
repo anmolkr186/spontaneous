@@ -21,7 +21,7 @@ import { ArrowUp, Image, Mic, Paperclip, Plus, Square, SquareDashed, StickyNote,
 import { Fold, IconKey, Key, Meter, Swap } from "@/ui/atoms";
 import { Tooltip } from "@/ui/base/tooltip/tooltip";
 import { ModelPicker, CLAUDE_MODELS } from "@/ui/molecules/model-picker";
-import type { Effort, EffortOption, PickerModel } from "@/ui/molecules/model-picker";
+import type { Effort, EffortOption, Harness, PickerModel } from "@/ui/molecules/model-picker";
 import { NotePin } from "@/ui/organisms/agent";
 import { formatTime } from "@/editor/model";
 import { blurIn } from "@/ui/tokens/motion";
@@ -48,7 +48,6 @@ export interface ComposerAttachment {
 export interface ComposerSendDetails {
   attachments: ComposerAttachment[];
   model: string;
-  thinking: boolean;
   effort: Effort;
 }
 
@@ -78,7 +77,15 @@ export interface ChatComposerProps {
   onAttach?: (kind: AttachKind) => ComposerAttachment | null | void;
   /** The playhead, in seconds. The "+" menu offers the frame there. */
   playhead?: number;
-  /** Models for the picker. Default: Auto and the current Claude models. */
+  /** Harnesses for the picker's left segment, e.g. Claude Code and Codex. Leave out for the model key alone. */
+  harnesses?: Harness[];
+  /** Chosen harness (controlled). */
+  harness?: string;
+  /** Called with the picked harness's id. */
+  onHarnessChange?: (id: string) => void;
+  /** Why Send can't run right now, e.g. the chosen harness isn't wired. Send stays off and says this; the text stays. */
+  sendBlocked?: string;
+  /** Models for the picker. Default: the current Claude models. */
   models?: PickerModel[];
   /** Chosen model (controlled). */
   model?: string;
@@ -96,13 +103,10 @@ export interface ChatComposerProps {
   dictation?: string;
   /** Placeholder of the field. */
   placeholder?: string;
-  /** Extended thinking, when the host controls it. */
-  thinking?: boolean;
-  onThinkingChange?: (on: boolean) => void;
   /** Thinking effort, when the host controls it; one of `efforts`. */
   effort?: Effort;
   onEffortChange?: (effort: Effort) => void;
-  /** The effort levels to offer in the model picker. */
+  /** The effort levels to offer in the model picker, lowest first. Empty hides the effort. */
   efforts?: EffortOption[];
   /** Offer dictation. Off until real speech-to-text is wired, so it never simulates words. */
   voice?: boolean;
@@ -152,10 +156,11 @@ function Chip({ item, onRemove }: { item: ComposerAttachment; onRemove: () => vo
 export function ChatComposer({
   value, defaultValue = "", onChange, onSend, running = false, onStop,
   attachments, defaultAttachments = [], onAttachmentsChange, onAttach, playhead = 0,
+  harnesses, harness, onHarnessChange, sendBlocked,
   models = CLAUDE_MODELS, model, defaultModel, onModelChange,
   listening, onListeningChange, transcript, dictation = "Cut the pause before the share dialog and zoom on the invite link",
   placeholder = "Describe an edit, or ask about the recording…", className,
-  thinking: thinkingProp, onThinkingChange, effort: effortProp, onEffortChange, efforts, voice = true, meta, systemInput = true,
+  effort: effortProp, onEffortChange, efforts, voice = true, meta, systemInput = true,
 }: ChatComposerProps) {
   const reduce = useReducedMotion();
   const field = useRef<HTMLTextAreaElement>(null);
@@ -170,13 +175,10 @@ export function ChatComposer({
   const items = attachments ?? attachState;
   const setItems = (next: ComposerAttachment[]) => { if (attachments === undefined) setAttachState(next); onAttachmentsChange?.(next); };
 
-  const [modelState, setModelState] = useState(() => defaultModel ?? models[0]?.id ?? "auto");
-  // Thinking and effort follow the host when it controls them (the app passes the CLI's choice).
-  const [thinkingState, setThinkingState] = useState(false);
+  const [modelState, setModelState] = useState(() => defaultModel ?? models[0]?.id ?? "");
+  // Effort follows the host when it controls it (the app passes the CLI's choice).
   const [effortState, setEffortState] = useState<Effort>("medium");
-  const thinking = thinkingProp ?? thinkingState;
   const effort = effortProp ?? effortState;
-  const setThinking = (on: boolean) => { if (thinkingProp === undefined) setThinkingState(on); onThinkingChange?.(on); };
   const setEffort = (e: Effort) => { if (effortProp === undefined) setEffortState(e); onEffortChange?.(e); };
 
   const [status, setStatus] = useState("");
@@ -250,12 +252,12 @@ export function ChatComposer({
   const remove = (id: string) => { setItems(items.filter((a) => a.id !== id)); field.current?.focus(); };
 
   /* Send */
-  const canSend = !running && !isListening && (text.trim().length > 0 || items.length > 0);
+  const canSend = !running && !isListening && !sendBlocked && (text.trim().length > 0 || items.length > 0);
   // Send competes for the panel's primary: a decision waiting elsewhere on the panel outranks it.
   const sendRole = useCtaRole("run", canSend);
   const send = () => {
     if (!canSend) return;
-    onSend?.(text.trim(), { attachments: items, model: model ?? modelState, thinking, effort });
+    onSend?.(text.trim(), { attachments: items, model: model ?? modelState, effort });
     setText("");
     setItems([]);
     announce("Sent");
@@ -341,9 +343,10 @@ export function ChatComposer({
         </span>
 
         {meta}
-        <ModelPicker models={models} value={model ?? modelState} side="top" align="end"
+        <ModelPicker harnesses={harnesses} harness={harness} onHarnessChange={onHarnessChange}
+          models={models} value={model ?? modelState} side="top" align="end"
           onChange={(id) => { setModelState(id); onModelChange?.(id); }}
-          thinking={thinking} onThinkingChange={setThinking} effort={effort} onEffortChange={setEffort} efforts={efforts} />
+          effort={effort} onEffortChange={setEffort} efforts={efforts} />
 
         {voice && (
           <IconKey label={isListening ? "Keep what you said" : "Dictate"} tooltip="top" variant="tertiary"
@@ -352,7 +355,7 @@ export function ChatComposer({
           </IconKey>
         )}
 
-        <IconKey label={running ? "Stop" : "Send"} shortcut={running ? undefined : "↵"} tooltip="top" variant={isListening ? "secondary" : running ? "primary" : sendRole}
+        <IconKey label={running ? "Stop" : sendBlocked ?? "Send"} shortcut={running || sendBlocked ? undefined : "↵"} tooltip="top" variant={isListening ? "secondary" : running ? "primary" : sendRole}
           className={styles.send} disabled={!running && !canSend} onClick={running ? onStop : send}>
           <Swap id={running ? "stop" : "send"}>{running ? <Square className={styles.stopGlyph} /> : <ArrowUp />}</Swap>
         </IconKey>

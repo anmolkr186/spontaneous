@@ -1,14 +1,41 @@
 /* ── Trigger ─────────────────────────────────────────────────────
-   A tertiary key: the model's short name, a bulb that unfolds
-   sideways while thinking is on, and a chevron.                  */
+   A tertiary key: the model's short name, its effort in muted
+   text, and a chevron.                                           */
 button.trigger[data-size] { gap: 0; padding: 0 var(--space-1-5) 0 var(--space-2); }
 .triggerName { height: 16px; line-height: 16px; }
-.bulb { display: grid; grid-template-columns: 0fr; opacity: 0; transition: grid-template-columns var(--duration-fold) var(--ease-glide), opacity 200ms ease; }
-.bulb[data-on] { grid-template-columns: 1fr; opacity: 1; transition: grid-template-columns var(--duration-fold) var(--ease-glide), opacity 280ms ease 80ms; }
-.bulbClip { display: flex; align-items: center; min-width: 0; overflow: hidden; padding-left: var(--space-1); }
-.trigger .bulbClip svg { width: 12px; height: 12px; stroke-width: 2; color: var(--foreground); }
-.trigger .triggerChevron { width: 12px; height: 12px; margin-left: var(--space-1); stroke-width: 2; color: var(--text-muted); transition: rotate var(--duration-standard) var(--ease-standard); }
-.trigger[data-state="open"] .triggerChevron { rotate: 180deg; }
+.triggerEffort { height: 16px; margin-left: var(--space-1-5); color: var(--text-muted); line-height: 16px; }
+.trigger:hover .triggerEffort, .trigger[data-state="open"] .triggerEffort { color: var(--text-secondary); }
+.trigger .triggerChevron, .harnessKey .triggerChevron { width: 12px; height: 12px; margin-left: var(--space-1); stroke-width: 2; color: var(--text-muted); transition: rotate var(--duration-standard) var(--ease-standard); }
+.trigger[data-state="open"] .triggerChevron, .harnessKey[data-state="open"] .triggerChevron { rotate: 180deg; }
+
+/* ── Segmented key ───────────────────────────────────────────────
+   Harness and model share one well; a hairline splits them.      */
+.group { display: inline-flex; align-items: center; height: var(--control-height-sm); padding: 0 1px; border-radius: var(--radius-sm); background: var(--well-bg); box-shadow: var(--well-shadow); }
+.group > button[data-size] { height: calc(var(--control-height-sm) - 2px); }
+.groupRule { width: 1px; height: 12px; background: var(--border-subtle); }
+button.harnessKey[data-size] { gap: 0; padding: 0 var(--space-1) 0 var(--space-1-5); }
+.harnessIcon { display: grid; place-items: center; color: var(--foreground); }
+.harnessIcon svg { width: 14px; height: 14px; }
+
+.harnessMenu {
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: var(--dock-pad);
+  border-radius: var(--radius-dock);
+  background: var(--dock-bg);
+  box-shadow: var(--dock-shadow);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+}
+.harnessMenu[data-state="open"] { animation: menuIn var(--reveal-duration) var(--ease-reveal); }
+.harnessMenu[data-state="closed"] { animation: menuOut var(--collapse-duration) var(--ease-collapse) forwards; }
+.harnessItem { display: grid; grid-template-columns: 16px minmax(0, 1fr) 14px; align-items: center; column-gap: var(--space-2); min-height: 36px; padding: var(--space-1-5) var(--space-2-5); border-radius: var(--radius-key); outline: none; cursor: default; }
+.harnessItem[data-highlighted] { background: var(--pressed); }
+.harnessItem .harnessIcon { color: var(--text-muted); }
+.harnessItem[data-highlighted] .harnessIcon, .harnessItem[data-state="checked"] .harnessIcon { color: var(--foreground); }
 
 /* ── Menu ────────────────────────────────────────────────────────
    A dock slab. It grows out of the trigger's corner on the reveal
@@ -35,6 +62,7 @@ button.trigger[data-size] { gap: 0; padding: 0 var(--space-1-5) 0 var(--space-2)
 
 /* Model column, three meter columns, the check. Shared by the legend and every row. */
 .legend, .option { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 34px) 14px; align-items: center; column-gap: var(--space-1-5); }
+.menu[data-plain] .legend, .menu[data-plain] .option { grid-template-columns: minmax(0, 1fr) 14px; }
 .legend { height: 22px; padding: 0 var(--space-2-5); color: var(--text-faint); font-size: var(--text-2xs); font-weight: var(--weight-medium); }
 
 .list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; outline: none; }
@@ -72,12 +100,18 @@ button.trigger[data-size] { gap: 0; padding: 0 var(--space-1-5) 0 var(--space-2)
 .option[data-active] .segments + .segments .seg[data-fill] { transition-delay: calc(60ms + var(--n) * 45ms); }
 .option[data-active] .segments + .segments + .segments .seg[data-fill] { transition-delay: calc(120ms + var(--n) * 45ms); }
 
-/* ── Settings ────────────────────────────────────────────────── */
+/* ── Effort ──────────────────────────────────────────────────
+   A ladder of skewed cells, filled up to the chosen level. Pointing
+   previews a level; the label rolls to it.                       */
 .settings { display: flex; flex-direction: column; padding: var(--space-1) 0; box-shadow: inset 0 1px 0 var(--border-subtle); }
-.setting { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 40px; padding: var(--space-1) var(--space-2-5); }
-.settingText { display: flex; flex-direction: column; min-width: 0; }
-.settingName { color: var(--foreground); font-weight: var(--weight-medium); }
-.settingHint { color: var(--text-muted); font-size: var(--text-xs); }
+.effort { display: flex; align-items: center; gap: var(--space-2-5); min-height: 40px; padding: var(--space-1) var(--space-2-5); }
+.settingName { flex: 1; color: var(--foreground); font-weight: var(--weight-medium); }
+.ladder { display: inline-flex; align-items: center; }
+.rung { display: grid; place-items: center; width: 16px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-xs); background: none; cursor: pointer; }
+.rung:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--border-strong); }
+.rungCell { background: var(--g-650); transition: background-color var(--duration-fast) ease; }
+.rung[data-fill] .rungCell { background: var(--g-100); transition-delay: calc(var(--n) * 25ms); }
+.effortLabel { min-width: 64px; height: 16px; color: var(--text-secondary); font-size: var(--text-xs); line-height: 16px; text-align: right; }
 
 /* ── Tray: what the highlighted model costs ──────────────────── */
 .tray {
@@ -98,5 +132,5 @@ button.trigger[data-size] { gap: 0; padding: 0 var(--space-1-5) 0 var(--space-2)
 .trayValue { color: var(--foreground); font-weight: var(--weight-medium); }
 
 @media (prefers-reduced-motion: reduce) {
-  .option[data-active] .seg[data-fill] { transition-delay: 0ms !important; }
+  .option[data-active] .seg[data-fill], .rung[data-fill] .rungCell { transition-delay: 0ms !important; }
 }

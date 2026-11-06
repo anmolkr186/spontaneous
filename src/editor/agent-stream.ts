@@ -129,21 +129,53 @@ export function reduceParts(content: Part[], event: AgentEvent): Part[] {
  * preview. The aliases follow the latest version, so they don't name one.
  */
 export const AGENT_MODELS = [
-  { value: "default", label: "Default" },
   { value: "fable", label: "Fable" },
   { value: "opus", label: "Opus" },
   { value: "sonnet", label: "Sonnet" },
   { value: "haiku", label: "Haiku" },
 ];
 
-/** The fallback effort levels, for the same case. */
+/** The fallback effort levels, lowest first, for the same case. */
 export const AGENT_EFFORTS = [
-  { value: "default", label: "Default" },
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
   { value: "xhigh", label: "Extra high" },
   { value: "max", label: "Max" },
+];
+
+/** The CLI lists its own "default" entry. The app never offers it: a choice is always a real model. */
+export const isDefaultEntry = (value: string) => value === "default";
+
+/**
+ * The model to start on when nothing is picked: the one the CLI's "default"
+ * entry recommends, else Opus, else the first it lists.
+ */
+export function recommendedModel(catalog: { value: string; displayName: string; description?: string }[] | null): string {
+  const list = catalog ?? AGENT_MODELS.map((m) => ({ value: m.value, displayName: m.label, description: undefined }));
+  const real = list.filter((m) => !isDefaultEntry(m.value));
+  const hint = list.filter((m) => isDefaultEntry(m.value)).map((m) => `${m.displayName} ${m.description ?? ""}`).join(" ").toLowerCase();
+  const fam = ["fable", "opus", "sonnet", "haiku"].map((f) => ({ f, at: hint.indexOf(f) })).filter((x) => x.at >= 0).sort((a, b) => a.at - b.at)[0]?.f ?? "opus";
+  return (real.find((m) => m.value.includes(fam) || m.displayName.toLowerCase().includes(fam)) ?? real[0])?.value ?? "opus";
+}
+
+/** The effort to start on: Medium when offered, else the lowest. Null when the model has no effort. */
+export function preferredEffort(levels: string[]): string | null {
+  return levels.includes("medium") ? "medium" : levels[0] ?? null;
+}
+
+/** The harnesses the panel can switch between. Only Claude Code runs today. */
+export type HarnessId = "claude-code" | "codex";
+
+/**
+ * Codex's current models, as its CLI lists them. Nothing runs Codex yet, so
+ * this is what the picker shows until the Codex host reads them live.
+ */
+export const CODEX_MODELS: { value: string; label: string; description: string; efforts: string[] }[] = [
+  { value: "gpt-6.1-sol", label: "GPT-6.1-Sol", description: "Workhorse for coding and everyday work", efforts: ["low", "medium", "high", "xhigh", "max", "ultra"] },
+  { value: "gpt-6-astra", label: "GPT-6-Astra", description: "Frontier intelligence for the hardest work", efforts: ["low", "medium", "high", "xhigh", "max", "ultra"] },
+  { value: "gpt-6.1-terra", label: "GPT-6.1 Terra", description: "Balanced, for straightforward work", efforts: ["low", "medium", "high", "xhigh", "max", "ultra"] },
+  { value: "gpt-6-luna", label: "GPT-6-Luna", description: "Fast and affordable, for easier edits", efforts: ["low", "medium", "high", "xhigh", "max"] },
 ];
 
 const EFFORT_LABELS: Record<string, string> = { xhigh: "Extra high" };

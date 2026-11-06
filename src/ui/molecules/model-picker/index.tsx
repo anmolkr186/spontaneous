@@ -1,27 +1,34 @@
 /**
- * ModelPicker: which model the agent edits with, and whether it thinks first.
+ * ModelPicker: which harness runs the agent, which model it uses, and how hard
+ * it thinks.
  *
- * A quiet key names the model; a small bulb unfolds beside the name while
- * extended thinking is on. It opens a menu that grows out of the key's corner.
- * Pointing at a model fills its speed, quality and cost meters one cell at a
- * time while the other rows step back; the highlight glides between rows.
- * Under the list sit the thinking switch and, when it's on, the effort. The
- * tray at the bottom rolls to the highlighted model's first-token time and
- * price, so the cost of a choice shows before you make it.
+ * With `harnesses`, it's a segmented key: the left segment shows the harness's
+ * mark and opens a short menu to switch between them; the right segment names
+ * the model and its effort and opens the model menu. Without, it's the right
+ * segment alone.
+ *
+ * The model menu grows out of the key's corner. Pointing at a model fills its
+ * speed, quality and cost meters one cell at a time while the other rows step
+ * back; the highlight glides between rows. Under the list sits the effort, a
+ * ladder of cells that fill up to the chosen level. There is no "default"
+ * level: one is always picked, so you can see what the agent will do. The tray
+ * at the bottom rolls to the highlighted model's first-token time and price.
  *
  * The list is a listbox driven by aria-activedescendant: focus stays on the
  * list while the arrows move the highlight.
  */
 import { useId, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
+import * as Menu from "@radix-ui/react-dropdown-menu";
 import { motion, useReducedMotion } from "motion/react";
-import { Check, ChevronDown, Lightbulb } from "lucide-react";
-import { Cell, Fold, Key, RollNumber, RollText, Swap } from "@/ui/atoms";
-import { Switcher } from "@/ui/molecules";
-import { Switch } from "@/ui/base/switch/switch";
+import { Check, ChevronDown } from "lucide-react";
+import { Cell, Key, RollNumber, RollText, Swap } from "@/ui/atoms";
 import { motionTokens } from "@/ui/tokens/motion";
+import { ClaudeCodeIcon, CodexIcon } from "./harness-icons";
 import styles from "./model-picker.module.css";
+
+export { ClaudeCodeIcon, CodexIcon };
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -48,9 +55,23 @@ export interface PickerModel {
 export type Effort = string;
 export interface EffortOption { value: Effort; label: string }
 
-/** The models Spontaneous's agent can run on. Auto picks per edit. */
+/** Something that runs the agent, such as Claude Code or Codex. */
+export interface Harness {
+  id: string;
+  name: string;
+  /** Its mark, drawn in currentColor. */
+  icon: ReactNode;
+  /** A short line under the name in the menu, e.g. why it can't run yet. */
+  note?: string;
+}
+
+export const HARNESSES: Harness[] = [
+  { id: "claude-code", name: "Claude Code", icon: <ClaudeCodeIcon /> },
+  { id: "codex", name: "Codex", icon: <CodexIcon /> },
+];
+
+/** The models Spontaneous's agent can run on. */
 export const CLAUDE_MODELS: PickerModel[] = [
-  { id: "auto", name: "Auto", description: "Picks a model for each edit" },
   { id: "claude-opus-5-5", name: "Claude Opus 5.5", short: "Opus 5.5", description: "Long videos, many notes at once", speed: 2, quality: 5, cost: 4, latencyMs: 1800, pricePerM: 20 },
   { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", short: "Sonnet 5.5", description: "Everyday edits", speed: 4, quality: 4, cost: 2, latencyMs: 800, pricePerM: 10 },
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", short: "Haiku 5.5", description: "Quick trims and single zooms", speed: 5, quality: 3, cost: 1, latencyMs: 350, pricePerM: 0.5 },
@@ -67,7 +88,15 @@ const seconds = (tenths: number) => `${(tenths / 10).toFixed(1)}s`;
 const dollars = (cents: number) => (cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
 export interface ModelPickerProps {
-  /** The models, Auto first. Default: Auto and the three current Claude models. */
+  /** Harnesses to switch between in a left segment. Leave out for the model key alone. */
+  harnesses?: Harness[];
+  /** Id of the chosen harness (controlled). */
+  harness?: string;
+  /** Chosen harness when uncontrolled. Default: the first. */
+  defaultHarness?: string;
+  /** Called with the picked harness's id. */
+  onHarnessChange?: (id: string) => void;
+  /** The models. Default: the three current Claude models. */
   models?: PickerModel[];
   /** Id of the chosen model (controlled). */
   value?: string;
@@ -75,15 +104,9 @@ export interface ModelPickerProps {
   defaultValue?: string;
   /** Called with the picked model's id. */
   onChange?: (id: string) => void;
-  /** Extended thinking switch (controlled). */
-  thinking?: boolean;
-  /** Starting state of the thinking switch. */
-  defaultThinking?: boolean;
-  /** Called when the thinking switch flips. */
-  onThinkingChange?: (on: boolean) => void;
-  /** The effort levels to offer, as the CLI names them. Defaults to low, medium and high. */
+  /** The effort levels to offer, lowest first, as the CLI names them. Defaults to low, medium and high. Empty hides the effort. */
   efforts?: EffortOption[];
-  /** Thinking effort (controlled). The control only shows while thinking is on. */
+  /** Thinking effort (controlled). */
   effort?: Effort;
   /** Starting effort. */
   defaultEffort?: Effort;
@@ -113,23 +136,61 @@ function Segments({ value = 0 }: { value?: number }) {
   );
 }
 
+/** The effort as a ladder of cells, filled up to the chosen level. A radio group: arrows move the choice and the focus. */
+function EffortLadder({ efforts, value, onChange }: { efforts: EffortOption[]; value: Effort; onChange: (e: Effort) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const chosen = Math.max(0, efforts.findIndex((o) => o.value === value));
+  const [hover, setHover] = useState<number | null>(null);
+  const shown = hover ?? chosen;
+  const onKey = (e: KeyboardEvent) => {
+    const step = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
+    const to = e.key === "Home" ? 0 : e.key === "End" ? efforts.length - 1 : step ? Math.min(efforts.length - 1, Math.max(0, chosen + step)) : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    onChange(efforts[to]!.value);
+    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
+  };
+  return (
+    <div className={styles.effort}>
+      <span className={styles.settingName}>Effort</span>
+      <div ref={ref} role="radiogroup" aria-label="Effort" className={styles.ladder} onKeyDown={onKey} onPointerLeave={() => setHover(null)}>
+        {efforts.map((o, i) => (
+          <button key={o.value} type="button" role="radio" aria-checked={i === chosen} aria-label={o.label} tabIndex={i === chosen ? 0 : -1}
+            className={styles.rung} data-fill={i <= shown || undefined}
+            style={{ "--n": i } as CSSProperties} onPointerEnter={() => setHover(i)} onClick={() => onChange(o.value)}>
+            <Cell size={8} className={styles.rungCell} />
+          </button>
+        ))}
+      </div>
+      <RollText text={efforts[shown]?.label ?? ""} className={styles.effortLabel} aria-hidden />
+    </div>
+  );
+}
+
 export function ModelPicker({
-  models = CLAUDE_MODELS, value, defaultValue, onChange, thinking, defaultThinking = false, onThinkingChange,
+  harnesses, harness, defaultHarness, onHarnessChange,
+  models = CLAUDE_MODELS, value, defaultValue, onChange,
   effort, defaultEffort = "medium", onEffortChange, efforts = EFFORTS, open, defaultOpen = false, onOpenChange, side = "bottom", align = "start", className,
 }: ModelPickerProps) {
   const uid = useId();
   const reduce = useReducedMotion();
   const list = models.length ? models : CLAUDE_MODELS;
   const listRef = useRef<HTMLUListElement>(null);
-  const effortRef = useRef<HTMLDivElement>(null);
+
+  const [harnessState, setHarnessState] = useState(() => defaultHarness ?? harnesses?.[0]?.id);
+  const currentHarness = harnesses?.find((h) => h.id === (harness ?? harnessState)) ?? harnesses?.[0];
+  const pickHarness = (id: string) => {
+    if (harness === undefined) setHarnessState(id);
+    if (id !== currentHarness?.id) onHarnessChange?.(id);
+  };
 
   const [valueState, setValueState] = useState(() => defaultValue ?? list[0]!.id);
   const chosenIndex = Math.max(0, list.findIndex((m) => m.id === (value ?? valueState)));
   const chosen = list[chosenIndex]!;
-  const [thinkingState, setThinkingState] = useState(defaultThinking);
-  const isThinking = thinking ?? thinkingState;
   const [effortState, setEffortState] = useState<Effort>(defaultEffort);
-  const currentEffort = effort ?? effortState;
+  // An effort the list doesn't offer shows as the nearest it does: the first.
+  const currentEffort = efforts.some((o) => o.value === (effort ?? effortState)) ? (effort ?? effortState) : efforts[0]?.value ?? "";
+  const effortName = efforts.find((o) => o.value === currentEffort)?.label;
   const [openState, setOpenState] = useState(defaultOpen);
   const isOpen = open ?? openState;
 
@@ -142,6 +203,9 @@ export function ModelPicker({
     if (isOpen) { setActive(chosenIndex); setPointing(false); }
   }
   const shown = list[Math.min(active, list.length - 1)]!;
+  // Meters and the cost tray only show when some model has numbers for them; a column of "Varies" says nothing.
+  const anyRated = list.some(rated);
+  const anyCost = list.some((m) => m.latencyMs !== undefined || m.pricePerM !== undefined);
 
   const setOpen = (next: boolean) => {
     if (open === undefined) setOpenState(next);
@@ -153,10 +217,6 @@ export function ModelPicker({
     if (value === undefined) setValueState(m.id);
     if (m.id !== chosen.id) onChange?.(m.id);
     setOpen(false);
-  };
-  const setThinking = (on: boolean) => {
-    if (thinking === undefined) setThinkingState(on);
-    onThinkingChange?.(on);
   };
   const setEffort = (e: Effort) => {
     if (effort === undefined) setEffortState(e);
@@ -173,40 +233,29 @@ export function ModelPicker({
     else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(active); }
   };
 
-  // Effort is a radio group with arrow keys; focus follows the chosen level.
-  const onEffortKey = (e: KeyboardEvent) => {
-    const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
-    if (!step) return;
-    e.preventDefault();
-    const i = efforts.findIndex((o) => o.value === currentEffort);
-    const next = efforts[Math.min(efforts.length - 1, Math.max(0, i + step))]!;
-    setEffort(next.value);
-    requestAnimationFrame(() => effortRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
-  };
-
   const spoken = (m: PickerModel) => [
     m.description,
-    rated(m) ? `speed ${m.speed ?? 0} of 5, quality ${m.quality ?? 0} of 5, cost ${m.cost ?? 0} of 5` : "speed and cost vary",
+    rated(m) ? `speed ${m.speed ?? 0} of 5, quality ${m.quality ?? 0} of 5, cost ${m.cost ?? 0} of 5` : anyRated ? "speed and cost vary" : null,
     m.latencyMs !== undefined ? `first token in ${(m.latencyMs / 1000).toFixed(1)} seconds` : null,
     m.pricePerM !== undefined ? `${dollars(Math.round(m.pricePerM * 100))} per million output tokens` : null,
   ].filter(Boolean).join(", ");
 
-  return (
+  const picker = (
     <Popover.Root open={isOpen} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <Key variant="tertiary" size="sm" className={cx(styles.trigger, className)}
-          aria-label={`Model: ${chosen.name}${isThinking ? `, extended thinking on, ${currentEffort} effort` : ""}`}
+        <Key variant="tertiary" size="sm" className={cx(styles.trigger, !harnesses && className)}
+          aria-label={`Model: ${chosen.name}${effortName ? `, ${effortName.toLowerCase()} effort` : ""}`}
           onKeyDown={(e) => { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setOpen(true); } }}>
           <RollText text={chosen.short ?? chosen.name} className={styles.triggerName} />
-          <span className={styles.bulb} data-on={isThinking || undefined} aria-hidden><span className={styles.bulbClip}><Lightbulb /></span></span>
+          {effortName && <RollText text={effortName} className={styles.triggerEffort} />}
           <ChevronDown className={styles.triggerChevron} aria-hidden />
         </Key>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className={styles.menu} side={side} align={align} sideOffset={6} collisionPadding={8}
+        <Popover.Content className={styles.menu} data-plain={!anyRated || undefined} side={side} align={align} sideOffset={6} collisionPadding={8}
           onOpenAutoFocus={(e) => { e.preventDefault(); listRef.current?.focus({ preventScroll: true }); }}>
           <div className={styles.legend} aria-hidden>
-            <span>Model</span><span>Speed</span><span>Quality</span><span>Cost</span>
+            <span>Model</span>{anyRated && <><span>Speed</span><span>Quality</span><span>Cost</span></>}
           </div>
           <ul ref={listRef} role="listbox" tabIndex={0} aria-label="Model" aria-activedescendant={`${uid}-opt-${active}`}
             className={styles.list} data-pointing={pointing || undefined} onKeyDown={onListKey} onPointerLeave={() => setPointing(false)}>
@@ -225,29 +274,19 @@ export function ModelPicker({
                     <Segments value={m.quality} />
                     <Segments value={m.cost} />
                   </>
-                ) : <span className={styles.varies} aria-hidden>Varies</span>}
+                ) : anyRated && <span className={styles.varies} aria-hidden>Varies</span>}
                 <span className={styles.optCheck} aria-hidden>{m.id === chosen.id && <Check />}</span>
               </li>
             ))}
           </ul>
 
-          <div className={styles.settings}>
-            <label className={styles.setting}>
-              <span className={styles.settingText}>
-                <span className={styles.settingName}>Extended thinking</span>
-                <span className={styles.settingHint}>Plans the edit before it makes it</span>
-              </span>
-              <Switch checked={isThinking} onCheckedChange={setThinking} aria-label="Extended thinking" />
-            </label>
-            <Fold open={isThinking}>
-              <div ref={effortRef} className={styles.setting} onKeyDown={onEffortKey}>
-                <span className={styles.settingName}>Effort</span>
-                <Switcher label="Effort" options={efforts} value={currentEffort} onChange={setEffort} />
-              </div>
-            </Fold>
-          </div>
+          {efforts.length > 0 && (
+            <div className={styles.settings}>
+              <EffortLadder efforts={efforts} value={currentEffort} onChange={setEffort} />
+            </div>
+          )}
 
-          <div className={styles.tray} aria-hidden>
+          {anyCost && <div className={styles.tray} aria-hidden>
             <span className={styles.trayItem}>
               <span className={styles.trayLabel}>First token</span>
               <Swap id={shown.latencyMs !== undefined ? "n" : "v"}>
@@ -260,9 +299,41 @@ export function ModelPicker({
               </Swap>
               <span className={styles.trayLabel}>per M output tokens</span>
             </span>
-          </div>
+          </div>}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  );
+
+  if (!harnesses?.length || !currentHarness) return picker;
+  return (
+    <span role="group" aria-label="Agent" className={cx(styles.group, className)}>
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Key variant="tertiary" size="sm" className={styles.harnessKey} aria-label={`Harness: ${currentHarness.name}`}>
+            <span className={styles.harnessIcon}>{currentHarness.icon}</span>
+            <ChevronDown className={styles.triggerChevron} aria-hidden />
+          </Key>
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Content className={styles.harnessMenu} side={side} align="start" sideOffset={6} collisionPadding={8}>
+            <Menu.RadioGroup value={currentHarness.id} onValueChange={pickHarness}>
+              {harnesses.map((h) => (
+                <Menu.RadioItem key={h.id} value={h.id} className={styles.harnessItem}>
+                  <span className={styles.harnessIcon}>{h.icon}</span>
+                  <span className={styles.optText}>
+                    <span className={styles.optName}>{h.name}</span>
+                    {h.note && <span className={styles.optDesc}>{h.note}</span>}
+                  </span>
+                  <Menu.ItemIndicator className={styles.optCheck}><Check /></Menu.ItemIndicator>
+                </Menu.RadioItem>
+              ))}
+            </Menu.RadioGroup>
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu.Root>
+      <span className={styles.groupRule} aria-hidden />
+      {picker}
+    </span>
   );
 }

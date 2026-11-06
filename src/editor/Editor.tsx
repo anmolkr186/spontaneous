@@ -701,16 +701,17 @@ function SidePanel() {
   const billedElsewhere = useAgent((s) => s.billedElsewhere);
   const open = notes.filter((n) => n.status === "open").length;
   const shown = useEditor((s) => s.panels.right);
-  const label = billedElsewhere ? "Not using your plan"
-    : connection.phase === "ready" ? "Claude Code"
+  // Which harness runs is shown in the composer; the header only speaks up when something's off.
+  const label = running ? "Working"
+    : billedElsewhere ? "Not using your plan"
+    : connection.phase === "ready" ? null
     : connection.phase === "checking" ? "Checking" : "Not connected";
   return (
     <Panel className={styles.side} inert={!shown} header={
       <>
         <Switcher label="Side panel" value={side} onChange={setSide} options={[{ value: "agent", label: "Agent" }, { value: "notes", label: "Notes", count: open }, { value: "changes", label: "Changes" }]} />
         <span className={styles.status}>
-          <Cell variant={running ? "solid" : "muted"} size={6} className={running ? styles.working : undefined} />
-          {running ? "Working" : label}
+          {label && <><Cell variant={running ? "solid" : "muted"} size={6} className={running ? styles.working : undefined} />{label}</>}
         </span>
         <AgentMenu />
       </>
@@ -732,15 +733,18 @@ function AgentPane() {
 }
 
 function AgentConversation() {
+  const harness = useAgent((s) => s.harness);
   const { undo } = useAgent.getState();
   const actions = useAgentActions();
+  const empty = harness === "codex" ? "Codex can't run here yet. Switch to Claude Code in the composer to talk through your notes."
+    : "Talk through your notes with Claude Code. It can't change the timeline yet.";
   return (
     <AgentThread
       above={<AgentAbove />}
       composer={<AgentComposerBar />}
       actions={actions}
       onUndo={undo}
-      empty={isTauri ? <AgentEmpty>Talk through your notes with Claude Code. It can't change the timeline yet.</AgentEmpty> : undefined}
+      empty={isTauri || harness === "codex" ? <AgentEmpty>{empty}</AgentEmpty> : undefined}
     />
   );
 }
