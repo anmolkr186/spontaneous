@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import { ChevronRight, RotateCcw, Search } from "lucide-react";
 import { Fold, IconKey, Key, Mark, Tag } from "@/ui/atoms";
 import { Switcher } from "@/ui/molecules";
 import { CATEGORIES, ENTRIES } from "./registry";
+import { BylineWorkbench } from "./workbench/byline";
 import { HarnessPage, StreamSection } from "./stream";
 import { ArbitrationDemo, LabelTester } from "./actions/arbitration";
 import { PRIORITY } from "@/ui/cta";
@@ -26,9 +28,14 @@ const FOUNDATIONS = [
 ] as const;
 type FoundationId = (typeof FOUNDATIONS)[number]["id"];
 
+/* Workbench: open design questions, laid out side by side to pick from. */
+const WORKBENCH = [
+  { id: "wb-byline", name: "Byline alignment", render: () => <BylineWorkbench /> },
+] as const;
+
 function readHash(): string {
   const id = location.hash.slice(1);
-  return ENTRIES.some((e) => e.id === id) || FOUNDATIONS.some((f) => f.id === id) ? id : "introduction";
+  return ENTRIES.some((e) => e.id === id) || FOUNDATIONS.some((f) => f.id === id) || WORKBENCH.some((w) => w.id === id) ? id : "introduction";
 }
 
 export function DocsApp() {
@@ -43,6 +50,7 @@ export function DocsApp() {
   const filtered = useMemo(() => ENTRIES.filter((e) => e.name.toLowerCase().includes(query.toLowerCase())), [query]);
   const go = (id: string) => { location.hash = id; };
   const entry = ENTRIES.find((e) => e.id === page);
+  const workbench = WORKBENCH.find((w) => w.id === page);
 
   return (
     <div className={styles.shell}>
@@ -60,6 +68,12 @@ export function DocsApp() {
           <h4 className={styles.groupTitle}>Foundations</h4>
           {FOUNDATIONS.map((f) => (
             <button key={f.id} type="button" className={styles.item} aria-current={page === f.id ? "page" : undefined} onClick={() => go(f.id)}>{f.name}</button>
+          ))}
+        </div>
+        <div className={styles.group}>
+          <h4 className={styles.groupTitle}>Workbench</h4>
+          {WORKBENCH.map((w) => (
+            <button key={w.id} type="button" className={styles.item} aria-current={page === w.id ? "page" : undefined} onClick={() => go(w.id)}>{w.name}</button>
           ))}
         </div>
         <div className={styles.group}>
@@ -91,10 +105,20 @@ export function DocsApp() {
       </aside>
       <main className={styles.main}>
         <motion.article key={page} className={styles.article} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.16 }}>
-          {entry ? <ComponentPage entry={entry} /> : <Foundation id={page as FoundationId} go={go} />}
+          {entry ? <ComponentPage entry={entry} /> : workbench ? <WorkbenchPage name={workbench.name}>{workbench.render()}</WorkbenchPage> : <Foundation id={page as FoundationId} go={go} />}
         </motion.article>
       </main>
     </div>
+  );
+}
+
+function WorkbenchPage({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <>
+      <div className={styles.crumb}><span>Workbench</span><ChevronRight /><span>{name}</span></div>
+      <h1 className={styles.title}>{name}</h1>
+      {children}
+    </>
   );
 }
 
