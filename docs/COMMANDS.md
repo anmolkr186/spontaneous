@@ -17,6 +17,7 @@ nvm use
 | Command | Use it when | What it does | Where the result goes |
 |---|---|---|---|
 | `npm run tauri:dev` | Day-to-day work | Runs the app as "Spontaneous Dev" with live reload | Opens the app. The build cache goes in `~/Builds/sptn.noindex/target` |
+| `npm run dev` | Working on the editor, playback or the agent panel without the app | Opens the editor at http://localhost:1420 with the sample recording in `dev/sample` loaded as if you'd just recorded it. Add `?recording=latest` for your newest capture in `~/Movies/Spontaneous`, or `?recording=none` for no clip. The agent there is scripted, not your CLI | Your browser. Edits aren't saved |
 | `npm run package` | You want a version to install | Builds and signs the real app, then copies out the DMG | `~/Builds/sptn.noindex/dmg` |
 | `npm version patch` | Shipping a fix | Checks you're on `main`, runs the typecheck, bumps the version, then commits, tags and pushes | GitHub builds the DMG and creates a draft release |
 | `npm version minor` | Shipping a feature | Same, with a larger version bump | Same |

@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "options": {
+    "target": {
+      "kind": "window",
+      "windowId": 1
+    },
+    "fps": 60,
+    "systemAudio": false,
+    "microphone": false,
+    "codec": "h264"
+  },
+  "captureRect": {
+    "x": 36,
+    "y": 60,
+    "width": 1440,
+    "height": 900
+  },
+  "scale": 2,
+  "width": 2880,
+  "height": 1800,
+  "videoStartMs": 312.5,
+  "durationMs": 36000,
+  "startedAtUnixMs": 1793959200000
+}

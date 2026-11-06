@@ -1,6 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
+import { devRecording } from "./dev-recording";
 import { isTauri } from "./tauri";
 
 /** Mirrors crates/capture (serde camelCase). */
@@ -72,8 +73,11 @@ export const capture = {
     isTauri ? invoke<string>("capture_start", { args: { name, options } }) : Promise.reject(new Error("Recording needs the desktop app")),
   stop: () => invoke<RecordingSummary>("capture_stop"),
   discard: () => invoke<void>("capture_discard"),
-  /** The last finished recording, held by the app so a reload or missed event can't lose it. */
-  lastFinished: () => (isTauri ? invoke<RecordingSummary | null>("capture_last_finished") : Promise.resolve(null)),
+  /**
+   * The last finished recording, held by the app so a reload or missed event can't lose it.
+   * On localhost the browser build gets a sample from the dev server instead (src/platform/dev-recording.ts).
+   */
+  lastFinished: () => (isTauri ? invoke<RecordingSummary | null>("capture_last_finished") : import.meta.env.DEV ? devRecording() : Promise.resolve(null)),
   openRecorder: (source: "display" | "window" | "area" = "display") => (isTauri ? invoke<void>("open_recorder_window", { source }) : Promise.resolve()),
   elapsed: () => invoke<number | null>("capture_elapsed"),
   /** Open the full-screen picker over a display: drag an area, or click a window. */

@@ -1,11 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
+import { devRecordings } from "./scripts/dev-recordings";
 
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), devRecordings()],
   resolve: { alias: { "@": resolve(__dirname, "src") } },
   clearScreen: false,
   server: {
