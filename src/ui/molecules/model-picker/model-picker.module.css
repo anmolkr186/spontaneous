@@ -79,7 +79,7 @@ button.harnessKey[data-size] { gap: 0; padding: 0 var(--space-1) 0 var(--space-1
 .option > :not(.fill) { position: relative; }
 /* The highlight is one element that glides between rows. */
 .fill { position: absolute; inset: 0; border-radius: inherit; background: var(--pressed); box-shadow: inset 0 1px 0 rgb(255 255 255 / .03); }
-.list:focus-visible .fill { box-shadow: inset 0 0 0 1px var(--border-strong); }
+:global(:root:not([data-input="pointer"])) .list:focus-visible .fill { box-shadow: inset 0 0 0 1px var(--border-strong); }
 /* Pointing at a model steps the others back. */
 .list[data-pointing] .option:not([data-active]) { opacity: .5; }
 

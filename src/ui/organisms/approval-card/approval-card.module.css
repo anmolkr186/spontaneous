@@ -99,7 +99,7 @@
   transition: scale var(--duration-instant) var(--ease-standard);
 }
 .check:active .checkBox { scale: .92; }
-.checkInput:focus-visible + .checkBox { outline: 2px solid var(--focus-outline, rgb(236 236 239 / .55)); outline-offset: 2px; }
+:global(:root:not([data-input="pointer"])) .checkInput:focus-visible + .checkBox { outline: 2px solid var(--focus-outline, rgb(236 236 239 / .55)); outline-offset: 2px; }
 .checkFace {
   display: grid;
   place-items: center;

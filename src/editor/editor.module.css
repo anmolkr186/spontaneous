@@ -66,7 +66,7 @@
 .previewTime { flex: none; min-width: 6.2ch; padding: 0 var(--space-1); font-size: var(--text-xs); }
 .spanTrack { position: relative; flex: 1; align-self: stretch; min-width: 80px; cursor: pointer; touch-action: none; }
 .spanTrack:focus-visible { outline: none; }
-.spanTrack:focus-visible .spanRail { box-shadow: var(--well-shadow), 0 0 0 2px var(--focus-ring, rgb(255 255 255 / .25)); }
+:global(:root:not([data-input="pointer"])) .spanTrack:focus-visible .spanRail { box-shadow: var(--well-shadow), 0 0 0 2px var(--focus-ring, rgb(255 255 255 / .25)); }
 .spanRail { position: absolute; top: 25%; bottom: 25%; left: 0; right: 0; border-radius: var(--radius-sm); background: var(--g-950); box-shadow: var(--well-shadow); }
 /* Each move of the shot, where it happens in the span; after the last one the shot rests. */
 .spanMove { position: absolute; top: 44%; height: 12%; min-width: 3px; translate: 0 -50%; border-radius: 2px; background: var(--g-400); pointer-events: none; }

@@ -291,10 +291,13 @@ input, textarea, [contenteditable] { user-select: text; -webkit-user-select: tex
 button { font: inherit; color: inherit; cursor: default; }
 ::selection { background: rgb(240 180 68 / .28); }
 
-/* Keyboard focus only. Pointer focus never draws a ring; text fields show focus with their caret. */
+/* Keyboard focus only. Pointer focus never draws a ring; text fields show focus with their caret.
+   data-input is the last input used (src/ui/tokens/input-modality.ts): after a click, focus a menu
+   hands back to its trigger doesn't ring it. Components that draw their own ring gate on it too. */
 :focus:not(:focus-visible),
+:root[data-input="pointer"] :focus-visible,
 :is(input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, [contenteditable], [tabindex="-1"]):focus { outline: none !important; }
-:focus-visible:not(input, textarea, [contenteditable], [tabindex="-1"]) {
+:root:not([data-input="pointer"]) :focus-visible:not(input, textarea, [contenteditable], [tabindex="-1"]) {
   outline: var(--focus-outline-width, 2px) solid var(--focus-outline, rgb(236 236 239 / .55)) !important;
   outline-offset: var(--focus-outline-offset, 2px) !important;
 }

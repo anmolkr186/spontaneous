@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import "@/ui/tokens/tokens.css";
+import { trackInputModality } from "@/ui/tokens/input-modality";
 import { Kbd, Key } from "@/ui/atoms";
 import { capture } from "@/platform/capture";
 import type { WindowSource } from "@/platform/capture";
@@ -253,4 +254,5 @@ function Hint({ children, keys }: { children: string; keys?: [string, string] })
   );
 }
 
+trackInputModality();
 createRoot(document.getElementById("root")!).render(<StrictMode><Picker /></StrictMode>);

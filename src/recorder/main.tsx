@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import "@/ui/tokens/tokens.css";
+import { trackInputModality } from "@/ui/tokens/input-modality";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Key, Mark } from "@/ui/atoms";
 import { DockNotice, RecorderDock } from "@/ui/organisms/dock";
@@ -275,4 +276,5 @@ function useAutoSize(ref: React.RefObject<HTMLDivElement | null>) {
 /** Gap between the dock window and the bottom of the screen (matches the Rust side). */
 const DOCK_BOTTOM = 96;
 
+trackInputModality();
 createRoot(document.getElementById("root")!).render(<StrictMode><Recorder /></StrictMode>);
