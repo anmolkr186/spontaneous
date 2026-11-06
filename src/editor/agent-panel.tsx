@@ -103,7 +103,7 @@ export function AgentComposerBar() {
       effort={effortChoice ?? "medium"}
       onEffortChange={(e) => setEffortChoice(e)}
       efforts={canThink ? efforts : []}
-      voice={false}
+      voice={false} systemInput={false}
       meta={<ContextKey />}
       placeholder="Ask the agent, or describe an edit…"
     />

@@ -14,7 +14,7 @@
  * the agent runs, Send becomes Stop.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
+import type { ChangeEvent, CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUp, Image, Mic, Paperclip, Plus, Square, SquareDashed, StickyNote, X } from "lucide-react";
@@ -108,8 +108,20 @@ export interface ChatComposerProps {
   voice?: boolean;
   /** Small things in the control row before the model picker, e.g. context usage. */
   meta?: ReactNode;
+  /**
+   * Let macOS put text in the field: dictation, the emoji picker, Writing Tools,
+   * autocorrect and spell check. Off means only the keyboard, paste and drop write here.
+   */
+  systemInput?: boolean;
   className?: string;
 }
+
+/** Inserts the keyboard, paste and drop make. Anything else that inserts with no key pressed came from the OS. */
+const KEYLESS_OK = /^insert(?:FromPaste|FromDrop|FromYank|LineBreak|Paragraph)/;
+/** Typed text, an input method's included, lands within this long of a key press. */
+const KEY_WINDOW_MS = 1000;
+/** Turns off the text help WebKit offers on a field: corrections, spell check, inline predictions. */
+const NO_SYSTEM_TEXT = { spellCheck: false, autoCorrect: "off", autoCapitalize: "off", autoComplete: "off", writingsuggestions: "false" };
 
 const MENU: { kind: AttachKind; label: string; icon: ReactNode }[] = [
   { kind: "frame", label: "Frame at playhead", icon: <Image /> },
@@ -143,7 +155,7 @@ export function ChatComposer({
   models = CLAUDE_MODELS, model, defaultModel, onModelChange,
   listening, onListeningChange, transcript, dictation = "Cut the pause before the share dialog and zoom on the invite link",
   placeholder = "Describe an edit, or ask about the recording…", className,
-  thinking: thinkingProp, onThinkingChange, effort: effortProp, onEffortChange, efforts, voice = true, meta,
+  thinking: thinkingProp, onThinkingChange, effort: effortProp, onEffortChange, efforts, voice = true, meta, systemInput = true,
 }: ChatComposerProps) {
   const reduce = useReducedMotion();
   const field = useRef<HTMLTextAreaElement>(null);
@@ -248,7 +260,16 @@ export function ChatComposer({
     setItems([]);
     announce("Sent");
   };
+  // OS dictation, the emoji picker and Writing Tools insert text without a key
+  // press; with systemInput off that text is dropped and the field keeps its value.
+  const lastKey = useRef(0);
+  const onFieldChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const kind = (e.nativeEvent as InputEvent).inputType ?? "";
+    if (!systemInput && kind.startsWith("insert") && !KEYLESS_OK.test(kind) && performance.now() - lastKey.current > KEY_WINDOW_MS) return;
+    setText(e.target.value);
+  };
   const onFieldKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    lastKey.current = performance.now();
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
   };
   const onRootKey = (e: KeyboardEvent) => {
@@ -289,7 +310,7 @@ export function ChatComposer({
           </p>
         ) : (
           <textarea ref={field} className={styles.field} rows={1} value={text} placeholder={placeholder} aria-label="Message to the agent"
-            onChange={(e) => setText(e.target.value)} onKeyDown={onFieldKey} />
+            {...(systemInput ? {} : NO_SYSTEM_TEXT)} onChange={onFieldChange} onKeyDown={onFieldKey} />
         )}
       </div>
 
